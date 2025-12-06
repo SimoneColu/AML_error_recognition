@@ -42,16 +42,19 @@ def evaluate_er_models(config, step_normalization, sub_step_normalization, thres
     # Save the evaluation metrics in /logs/ as csv file and also push it to firebase database
     save_results(config, sub_step_metrics, step_metrics, step_normalization, sub_step_normalization, threshold)
 
-
-def evaluate_ecr_models(config, step_normalization, sub_step_normalization, threshold):
+    # Potrebbe servire conoscere il tipo di errore commesso, ma tanto non è implementata
+""" def evaluate_ecr_models(config, step_normalization, sub_step_normalization, threshold):
     # 1. Load the trained model
     # 2. Load the test data
     # 3. Pass the test data through the model
     # 4. Calculate the evaluation metrics
     # 5. Save the evaluation metrics in /logs/ as csv file and also push it to firebase database
-    pass
+    pass """
 
-
+# Questa funzione serve per trainare il modello e per valutarlo  
+# Grazie alla funzione ***test_er_model***, cosa fa:
+# Loop in cui calcola output del modello (da grezzi a prob con sigmoid) e prende i label reali 
+# Calcola le metriche sia a livello di subStep (cioè per ogni segmento) che a livello di Step (per video, cioè tutti i segmenti insieme)
 def evaluate_eer_models(config, step_normalization, sub_step_normalization, threshold):
     # 1. Load the trained model
     # 2. Load the test data
@@ -80,9 +83,10 @@ def evaluate_eer_models(config, step_normalization, sub_step_normalization, thre
     # ---------------------------------------------------------
 
     # Save the evaluation metrics in /logs/ as csv file and also push it to firebase database
+    # TODO: MODIFICARE SAVE RESULT E DI CONSEGUENZA SAVE RESULT OT CSV PER AVERE IL PATH CORRETTO  
     save_results(config, sub_step_metrics, step_metrics, step_normalization, sub_step_normalization, threshold)
 
-
+# Questa funzione è un training automatizzato per testare tutte le combinazioni possibili 
 def main_er():
     val_best_epochs = [43, 9, 15, 25, 15, 40, 41, 3, 37, 28, 38, 20, 44, 9, 18, 5, 17, 40, 27, 22, 38, 31, 45, 30, 39,
                        34, 27, 25, 28, 4, 25, 7, 39, 7, 10, 13, 26, 22, 14, None, 26, 24, 7, 41, 40, 7, 12, 2, 37, 14,
@@ -98,15 +102,18 @@ def main_er():
         for sub_step_normalization in [True]:
             for threshold in [0.5, 0.6]:
                 epoch_index = 0
-                for split in [const.STEP_SPLIT, const.RECORDINGS_SPLIT, const.PERSON_SPLIT, const.ENVIRONMENT_SPLIT]:
-                    for backbone in [const.OMNIVORE, const.SLOWFAST, const.X3D, const.RESNET3D, const.IMAGEBIND]:
-                        for variant in [const.MLP_VARIANT, const.TRANSFORMER_VARIANT]:
+                for split in [const.STEP_SPLIT, const.RECORDINGS_SPLIT, const.PERSON_SPLIT, const.ENVIRONMENT_SPLIT]: # indicano diversi modi di splittare i dati
+                    for backbone in [const.OMNIVORE, const.SLOWFAST]: # original line -> const.OMNIVORE, const.SLOWFAST, const.X3D, const.RESNET3D, const.IMAGEBIND
+                        # ma siccome noi vogliamo concentrarci solo su OMNIVORE e SLOWFAST tolgo le altre
+                        for variant in [const.MLP_VARIANT, const.TRANSFORMER_VARIANT]: # queste in teoria sono le due V1 e V2
                             conf = Config()
                             conf.split = split
                             conf.backbone = backbone
                             conf.variant = variant
                             conf.phase = const.TEST
-                            if backbone == const.IMAGEBIND:
+                            # questo if serve nel caso di V3 quando mixo tutti gli input insieme 
+                            # ma noi usiamo solo video quindi l'ho semplificato
+                            """ if backbone == const.IMAGEBIND:
                                 for modality in [[const.VIDEO], [const.AUDIO], [const.VIDEO, const.AUDIO]]:
                                     if best_epochs[epoch_index] is None:
                                         epoch_index += 1
@@ -124,10 +131,16 @@ def main_er():
                                 conf.ckpt_directory = f"/data/rohith/captain_cook/checkpoints/error_recognition/{variant}/{backbone}/error_recognition_{variant}_{backbone}_{split}_epoch_{best_epochs[epoch_index]}.pt"
                                 print(f"{variant}_{backbone}_{split}_{best_epochs[epoch_index]}.pt")
                                 evaluate_er_models(conf, step_normalization, sub_step_normalization, threshold)
-                                epoch_index += 1
+                                epoch_index += 1 """
+                            conf.modality = const.VIDEO
+                            conf.ckpt_directory = f"/data/rohith/captain_cook/checkpoints/error_recognition/{variant}/{backbone}/error_recognition_{variant}_{backbone}_{split}_epoch_{best_epochs[epoch_index]}.pt"
+                            # TODO: CAMBIARE DIRECTORY
+                            print(f"{variant}_{backbone}_{split}_{best_epochs[epoch_index]}.pt")
+                            evaluate_er_models(conf, step_normalization, sub_step_normalization, threshold)
+                            epoch_index += 1
 
 
-def main_cr_er():
+""" def main_cr_er():
     best_epochs = [17, 24]
     for step_normalization in [True]:
         for sub_step_normalization in [True]:
@@ -150,17 +163,18 @@ def main_cr_er():
                                 print(f"{variant}_{backbone}_{modality}_{split}_{best_epochs[epoch_index]}.pt")
                                 # conf.ckpt_directory = f"/data/rohith/captain_cook/checkpoints/error_recognition/MLP/imagebind/error_recognition_MLP_imagebind_video_recordings_epoch_42.pt"
                                 evaluate_er_models(conf, step_normalization, sub_step_normalization, threshold)
-                                epoch_index += 1
+                                epoch_index += 1 """
 
 
-def main_eer():
+# Questa funzione serve per EARLY ERROR RECOGNITION e non penso ci serva almeno per ora
+""" def main_eer():
     best_epochs = [24, 12, 44, 33, 29, 5, 33, 3, 46, 12, 32, 20, 43, 7, 45, 37]
     for step_normalization in [True]:
         for sub_step_normalization in [True]:
             for threshold in [0.5, 0.6]:
                 epoch_index = 0
                 for split in [const.RECORDINGS_SPLIT, const.STEP_SPLIT]:
-                    for backbone in [const.OMNIVORE, const.SLOWFAST, const.X3D, const.RESNET3D]:
+                    for backbone in [const.OMNIVORE, const.SLOWFAST]: # nella riga originale c'erano anche , const.X3D, const.RESNET3D
                         for variant in [const.MLP_VARIANT, const.TRANSFORMER_VARIANT]:
                             conf = Config()
                             conf.task_name = const.EARLY_ERROR_RECOGNITION
@@ -170,11 +184,12 @@ def main_eer():
                             conf.phase = const.TEST
 
                             modality = conf.modality
-                            conf.ckpt_directory = f"/data/rohith/captain_cook/checkpoints/{conf.task_name}/{variant}/{backbone}/early_error_recognition_{split}_{backbone}_{variant}_{modality}_epoch_{best_epochs[epoch_index]}.pt"
+                            conf.ckpt_directory = f"/data/rohith/captain_cook/checkpoints/{conf.task_name}/{variant}/{backbone}/early_error_recognition_{split}_{backbone}_{variant}_{modality}_epoch_{best_epochs[epoch_index]}.pt" 
+                            # TODO: CAMBIARE DIRECTORY
                             print(f"{variant}_{backbone}_{split}_{best_epochs[epoch_index]}.pt")
                             evaluate_er_models(conf, step_normalization, sub_step_normalization, threshold)
-                            epoch_index += 1
+                            epoch_index += 1 """
 
 
 if __name__ == '__main__':
-    main_cr_er()
+    main_er()

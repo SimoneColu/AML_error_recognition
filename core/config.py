@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 from constants import Constants as const
 
+# Questo file permette di modificare i parametri per Training, Testing e Validation
+# Sono le definizzioni di default, perchè i parametri posso passarli da riga di comando
 
 class Config(object):
     """Wrapper class for model hyperparameters."""
@@ -18,10 +20,10 @@ class Config(object):
         self.segment_features_directory = "/data/rohith/captain_cook/features/gopro/segments_1/"
 
         # Use this for 2 sec multimodal features
-        self.video_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/video"
-        self.audio_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/audio"
-        self.text_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/text"
-        self.depth_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/depth"
+        self.video_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/video" # TODO: CAMBIARE DIRECTORY !!
+        # self.audio_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/audio"
+        # self.text_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/text"
+        # self.depth_features_directory = "/data/rohith/captain_cook/features/gopro/segments_2/depth"
 
         self.ckpt_directory = "/data/rohith/captain_cook/checkpoints/"
         self.split = 'recordings'
