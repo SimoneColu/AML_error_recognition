@@ -7,8 +7,6 @@ import wandb
 from torch import optim, nn
 from torch.utils.data import DataLoader
 
-from analysis.results.FirebaseService import FirebaseService
-from analysis.results.Result import Metrics, ResultDetails, Result
 from constants import Constants as const
 import numpy as np
 import torch
@@ -21,8 +19,6 @@ from core.models.er_former import ErFormer
 from dataloader.CaptainCookStepDataset import collate_fn, CaptainCookStepDataset
 from dataloader.CaptainCookSubStepDataset import CaptainCookSubStepDataset
 
-db_service = FirebaseService()
-
 
 def fetch_model_name(config):
     if config.task_name == const.ERROR_CATEGORY_RECOGNITION:
@@ -30,7 +26,7 @@ def fetch_model_name(config):
     elif config.task_name in  [const.EARLY_ERROR_RECOGNITION, const.ERROR_RECOGNITION]:
         if config.model_name is None:
             if config.backbone in [const.RESNET3D, const.X3D, const.SLOWFAST, const.OMNIVORE]:
-                config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{config.modality}"
+                config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{config.modality[0]}"
             elif config.backbone == const.IMAGEBIND:
                 combined_modality_name = '_'.join(config.modality)
                 config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{combined_modality_name}"
@@ -102,29 +98,10 @@ def save_results_to_csv(config, sub_step_metrics, step_metrics, step_normalizati
         writer.writerow(collated_stats)
 
 
-def save_results_to_firebase(config, sub_step_metrics, step_metrics):
-    sub_step_metrics = Metrics.from_dict(sub_step_metrics)
-    step_metrics = Metrics.from_dict(step_metrics)
-    result_details = ResultDetails(sub_step_metrics, step_metrics)
-    result = Result(
-        task_name=config.task_name,
-        variant=config.variant,
-        backbone=config.backbone,
-        split=config.split,
-        model_name=config.model_name,
-        modality=config.modality
-    )
-
-    result.add_result_details(result_details)
-    db_service.update_result(result.result_id, result.to_dict())
-
-
 def save_results(config, sub_step_metrics, step_metrics, step_normalization=False, sub_step_normalization=False,
                  threshold=0.5):
     # 1. Save evaluation results to csv
     save_results_to_csv(config, sub_step_metrics, step_metrics, step_normalization, sub_step_normalization, threshold)
-    # 2. Save evaluation results to firebase
-    # save_results_to_firebase(config, sub_step_metrics, step_metrics)
 
 
 def store_model(model, config, ckpt_name: str):
@@ -150,7 +127,8 @@ def train_epoch(model, device, train_loader, optimizer, epoch, criterion):
     num_batches = len(train_loader)
     train_losses = []
 
-    for batch_idx, (data, target) in enumerate(train_loader):
+    ## aggiunto il terzo valore anche se inutilizzato perchè ora collate_fn nel dataloader ritorna 3 valori
+    for batch_idx, (data, target,_) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
 
         assert not torch.isnan(data).any(), "Data contains NaN values"
@@ -176,8 +154,7 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
     model = fetch_model(config)
     device = config.device
     optimizer = optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
-    # criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([2.5], dtype=torch.float32).to(device))
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([2.5], dtype=torch.float32).to(device))
     scheduler = ReduceLROnPlateau(
         optimizer, mode='max',
         factor=0.1, patience=5, verbose=True,
@@ -207,7 +184,8 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
             num_batches = len(train_loader)
             train_losses = []
 
-            for batch_idx, (data, target) in enumerate(train_loader):
+            ## aggiunto il terzo valore, anche se inutilizzaot, perchè ora collate_fn ritorna 3 valori
+            for batch_idx, (data, target,_) in enumerate(train_loader):
                 data, target = data.to(device), target.to(device)
 
                 assert not torch.isnan(data).any(), "Data contains NaN values"
@@ -292,7 +270,7 @@ def train_step_test_step_dataset_base(config):
         "num_workers": 8,
         "pin_memory": False,
     }
-    train_kwargs = {**cuda_kwargs, "shuffle": True, "batch_size": 1}
+    train_kwargs = {**cuda_kwargs, "shuffle": True, "batch_size": config.batch_size}
     test_kwargs = {**cuda_kwargs, "shuffle": False, "batch_size": 1}
 
     print("-------------------------------------------------------------")
@@ -343,12 +321,15 @@ def train_sub_step_test_step_dataset_base(config):
 
 # ----------------------- TEST BASE FILES -----------------------
 
-
-def test_er_model(model, test_loader, criterion, device, phase, step_normalization=False, sub_step_normalization=False,
-                  threshold=0.5):
+## modificata questa funzione aggiungendo una lista per gli errori, poi allo stesso modo sarà gestita ugualmente a all_targets e all_outputs
+def test_er_model(model, test_loader, criterion, device, phase, step_normalization=True, sub_step_normalization=True,
+                  threshold=0.6):
     total_samples = 0
     all_targets = []
     all_outputs = []
+
+    ## aggiungo un "accumulatore" per i tipi di errore
+    all_error_types = []
 
     test_loader = tqdm(test_loader)
     num_batches = len(test_loader)
@@ -358,7 +339,7 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
     counter = 0
 
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target, error_types in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
             total_samples += data.shape[0]
@@ -369,6 +350,9 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
             all_outputs.append(sigmoid_output.detach().cpu().numpy().reshape(-1))
             all_targets.append(target.detach().cpu().numpy().reshape(-1))
 
+            ## ssalviamo anche i tipi di errore
+            all_error_types.append(error_types.detach().cpu().numpy().reshape(-1))
+
             test_step_start_end_list.append((counter, counter + data.shape[0]))
             counter += data.shape[0]
 
@@ -378,6 +362,9 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
     # Flatten lists
     all_outputs = np.concatenate(all_outputs)
     all_targets = np.concatenate(all_targets)
+
+    ## allo stesso modo facciamo flatten anche per all_error_types
+    all_error_types = np.concatenate(all_error_types)
 
     # Assert that none of the outputs are NaN
     assert not np.isnan(all_outputs).any(), "Outputs contain NaN values"
@@ -404,15 +391,38 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
         const.PR_AUC: sub_step_pr_auc
     }
 
+    ## aggiunto stampa metriche per tipo di errore
+    print(f"\n===== {phase.upper()} STRATIFIED SUB-STEP METRICS =====")
+    ## iterazione sui tipi di errore incontrati, resi unici 
+    unique_errors = np.unique(all_error_types)
+    for err_id in unique_errors:
+        if err_id == 0: continue # Saltiamo "Nessun Errore" per l'analisi dei tipi
+        mask = (all_error_types == err_id)
+        if np.sum(mask) == 0: continue
+        
+        ## Metriche su questo subset
+        subset_target = all_targets[mask]
+        subset_pred = pred_sub_step_labels[mask]
+        ## Recall "locale" (su quanti di QUESTO tipo ne ho presi)
+        rec = recall_score(subset_target, subset_pred, zero_division=0)
+        prec = precision_score(subset_target, subset_pred, zero_division=0)
+        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Samples: {np.sum(mask)})")
+
     # -------------------------- Step Level Metrics --------------------------
     all_step_targets = []
     all_step_outputs = []
 
+    ## facciamo la stessa cosa anche per le step level 
+    all_step_error_types = []
     # threshold_outputs = all_outputs / max_probability
 
     for start, end in test_step_start_end_list:
         step_output = all_outputs[start:end]
         step_target = all_targets[start:end]
+
+        ## estraiamo il primo valore dell'error types tanto nello step sono tutti uguali gli errori
+        step_err_type = all_error_types[start]
+        all_step_error_types.append(step_err_type)
 
         # sorted_step_output = np.sort(step_output)
         # # Top 50% of the predictions
@@ -466,6 +476,24 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
         const.AUC: auc,
         const.PR_AUC: pr_auc
     }
+
+    ## aggiunta stampa metriche per tipo di errore ma relative allo step
+    ## -----------------------------------------------------------------
+    print(f"\n===== {phase.upper()} STRATIFIED STEP METRICS =====")
+    unique_step_errors = np.unique(all_step_error_types)
+    for err_id in unique_step_errors:
+        if err_id == 0: continue
+        mask = (all_step_error_types == err_id)
+        if np.sum(mask) == 0: continue
+        
+        subset_target = all_step_targets[mask]
+        subset_pred = pred_step_labels[mask]
+        
+        rec = recall_score(subset_target, subset_pred, zero_division=0)
+        prec = precision_score(subset_target, subset_pred, zero_division=0)
+        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Steps: {np.sum(mask)})")
+
+    ## -------------------------------------------------------------------   
 
     # Print step level metrics
     print("----------------------------------------------------------------")
