@@ -203,20 +203,9 @@ class CaptainCookStepDataset(Dataset):
         if self._config.task_name == const.ERROR_RECOGNITION:
             if step_has_errors:
                 step_labels = torch.ones(N, 1)
-
-                #---------- AGGIUNTA PER OTTENERE ANCHE IL TIPO DI ERRORE ----------
-                # estrazione del tipo di errore
-                # step_error_category_labels è un set (es. {5}). Prendiamo il primo elemento.
-                if step_error_category_labels and len(step_error_category_labels) > 0:
-                    # Convertiamo il set in lista e prendiamo il primo errore
-                    error_id = list(step_error_category_labels)[0]
-                    # il tipo di errore va spalmato su una lunghezza pari a N 
-                    step_error_types = torch.full((N, 1), error_id)
-                #-------------------------------------------------------------------
-
             else:
                 step_labels = torch.zeros(N, 1)
-            return step_features, step_labels
+
         elif self._config.task_name == const.EARLY_ERROR_RECOGNITION:
             # Input only half of the step features and labels
             step_features = step_features[:N // 2, :]
@@ -224,7 +213,7 @@ class CaptainCookStepDataset(Dataset):
                 step_labels = torch.ones(N // 2, 1)
             else:
                 step_labels = torch.zeros(N // 2, 1)
-            return step_features, step_labels
+
         elif self._config.task_name == const.ERROR_CATEGORY_RECOGNITION:
             # print(f"Error category: {self._config.error_category}")
             error_category_name = self._category_name_map[self._config.error_category]
@@ -234,7 +223,21 @@ class CaptainCookStepDataset(Dataset):
                 step_labels = torch.ones(N, 1)
             else:
                 step_labels = torch.zeros(N, 1)
-            return step_features, step_labels, step_error_types
+
+
+        #---------- AGGIUNTA PER OTTENERE ANCHE IL TIPO DI ERRORE ----------
+        current_steps = step_labels.shape[0]
+
+        step_error_types = torch.zeros(current_steps, 1)
+        # estrazione del tipo di errore
+        # step_error_category_labels è un set (es. {5}). Prendiamo il primo elemento.
+        if step_has_errors and step_error_category_labels and len(step_error_category_labels) > 0:
+            error_id = list(step_error_category_labels)[0]
+            
+            step_error_types = torch.full((current_steps, 1), error_id)
+        #-------------------------------------------------------------------
+        return step_features, step_labels, step_error_types
+
 
     def _build_modality_step_features_labels(self, recording_features, step_start_end_list):
         # Build step features by concatenating the features of the step from the list

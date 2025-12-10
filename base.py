@@ -392,21 +392,34 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
     }
 
     ## aggiunto stampa metriche per tipo di errore
-    print(f"\n===== {phase.upper()} STRATIFIED SUB-STEP METRICS =====")
     ## iterazione sui tipi di errore incontrati, resi unici 
+    print(f"\n===== {phase.upper()} STRATIFIED SUB-STEP METRICS (vs Normal) =====")
     unique_errors = np.unique(all_error_types)
+    
+    ## dobbiamo identificare quali indici non hanno alcun tipo di errore 
+    ## l'id 0 sta per "NESSUN ERRORE"
+    normal_mask = (all_error_types == 0)
+    
     for err_id in unique_errors:
-        if err_id == 0: continue # Saltiamo "Nessun Errore" per l'analisi dei tipi
-        mask = (all_error_types == err_id)
-        if np.sum(mask) == 0: continue
+        if err_id == 0: continue # Saltiamo il caso base
         
-        ## Metriche su questo subset
-        subset_target = all_targets[mask]
-        subset_pred = pred_sub_step_labels[mask]
-        ## Recall "locale" (su quanti di QUESTO tipo ne ho presi)
+        # Maschera: Vogliamo SOLO questo errore O i casi normali
+        # Questo errore (Positivi) | Normali (Negativi)
+        current_error_mask = (all_error_types == err_id)
+        combined_mask = current_error_mask | normal_mask
+        
+        if np.sum(combined_mask) == 0: continue
+        
+        subset_target = all_targets[combined_mask]
+        subset_pred = pred_sub_step_labels[combined_mask]
+        
         rec = recall_score(subset_target, subset_pred, zero_division=0)
         prec = precision_score(subset_target, subset_pred, zero_division=0)
-        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Samples: {np.sum(mask)})")
+        
+        # Calcoliamo quanti campioni positivi reali ci sono
+        n_positives = np.sum(current_error_mask)
+        
+        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Positives: {n_positives})")
 
     # -------------------------- Step Level Metrics --------------------------
     all_step_targets = []
@@ -457,6 +470,7 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
         all_step_outputs = (all_step_outputs - np.min(all_step_outputs)) / prob_range
 
     all_step_targets = np.array(all_step_targets)
+    all_step_error_types = np.array(all_step_error_types)
 
     # Calculate metrics at the step level
     pred_step_labels = (all_step_outputs > threshold).astype(int)
@@ -479,19 +493,33 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
 
     ## aggiunta stampa metriche per tipo di errore ma relative allo step
     ## -----------------------------------------------------------------
-    print(f"\n===== {phase.upper()} STRATIFIED STEP METRICS =====")
+    print(f"\n===== {phase.upper()} STRATIFIED STEP METRICS (vs Normal) =====")
     unique_step_errors = np.unique(all_step_error_types)
+    
+    # Identifica quali indici sono "Normali" (Nessun errore)
+    # Assumiamo che 0 sia l'ID per "Nessun Errore". Se è diverso, cambia questo valore.
+    normal_step_mask = (all_step_error_types == 0)
+    
     for err_id in unique_step_errors:
-        if err_id == 0: continue
-        mask = (all_step_error_types == err_id)
-        if np.sum(mask) == 0: continue
+        if err_id == 0: continue # Saltiamo il caso base
         
-        subset_target = all_step_targets[mask]
-        subset_pred = pred_step_labels[mask]
+        # Maschera: Vogliamo SOLO questo errore O i casi normali
+        # Questo errore (Positivi) | Normali (Negativi)
+        current_step_error_mask = (all_step_error_types == err_id)
+        combined_step_mask = current_step_error_mask | normal_step_mask
+        
+        if np.sum(combined_step_mask) == 0: continue
+        
+        subset_target = all_step_targets[combined_step_mask]
+        subset_pred = pred_step_labels[combined_step_mask]
         
         rec = recall_score(subset_target, subset_pred, zero_division=0)
         prec = precision_score(subset_target, subset_pred, zero_division=0)
-        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Steps: {np.sum(mask)})")
+        
+        # Calcoliamo quanti campioni positivi reali ci sono
+        n_positives = np.sum(current_step_error_mask)
+        
+        print(f"Error Type {err_id}: Recall={rec:.2f}, Precision={prec:.2f} (Positives: {n_positives})")
 
     ## -------------------------------------------------------------------   
 
