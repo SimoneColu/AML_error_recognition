@@ -50,6 +50,12 @@ def fetch_model(config):
     elif config.variant == const.TRANSFORMER_VARIANT:
         if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND]:
             model = ErFormer(config)
+    # ! added V3
+    elif config.variant == const.LSTM_VARIANT:
+        if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND]:
+            from core.models.blocks import LSTMBaseline
+            input_dim = fetch_input_dim(config)
+            model = LSTMBaseline(input_size=input_dim, hidden_size=256)
 
     assert model is not None, f"Model not found for variant: {config.variant} and backbone: {config.backbone}"
     model.to(config.device)
@@ -155,9 +161,10 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
     device = config.device
     optimizer = optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([2.5], dtype=torch.float32).to(device))
+    # ! removed attribute verbose here
     scheduler = ReduceLROnPlateau(
         optimizer, mode='max',
-        factor=0.1, patience=5, verbose=True,
+        factor=0.1, patience=5, 
         threshold=1e-4, threshold_mode="abs", min_lr=1e-7
     )
     # criterion = nn.BCEWithLogitsLoss()
@@ -192,6 +199,9 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
 
                 optimizer.zero_grad()
                 output = model(data)
+                # ! changed here
+                if target.dim() == 2 and target.size(-1) == 1:
+                    target = target.squeeze(-1)
                 loss = criterion(output, target)
 
                 if torch.isnan(loss).any():
@@ -341,6 +351,9 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
     with torch.no_grad():
         for data, target, error_types in test_loader:
             data, target = data.to(device), target.to(device)
+            # ! changed here
+            if target.dim() == 2 and target.size(-1) == 1:
+                    target = target.squeeze(-1)
             output = model(data)
             total_samples += data.shape[0]
             loss = criterion(output, target)
