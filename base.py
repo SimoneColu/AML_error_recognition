@@ -244,8 +244,8 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
                 }
             }
 
-            # if config.enable_wandb:
-            #     wandb.log(running_metrics)
+            if config.enable_wandb:
+                wandb.log(running_metrics)
 
             print(f'Epoch: {epoch}, Train Loss: {avg_train_loss:.6f}, Test Loss: {avg_test_loss:.6f}, '
                   f'Precision: {precision:.6f}, Recall: {recall:.6f}, F1: {f1:.6f}, AUC: {auc:.6f}')
