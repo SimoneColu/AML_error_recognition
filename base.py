@@ -200,8 +200,8 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
                 optimizer.zero_grad()
                 output = model(data)
                 # ! changed here
-                if target.dim() == 2 and target.size(-1) == 1:
-                    target = target.squeeze(-1)
+                # if target.dim() == 2 and target.size(-1) == 1:
+                #   target = target.squeeze(-1)
                 loss = criterion(output, target)
 
                 if torch.isnan(loss).any():
@@ -352,8 +352,8 @@ def test_er_model(model, test_loader, criterion, device, phase, step_normalizati
         for data, target, error_types in test_loader:
             data, target = data.to(device), target.to(device)
             # ! changed here
-            if target.dim() == 2 and target.size(-1) == 1:
-                    target = target.squeeze(-1)
+            # if target.dim() == 2 and target.size(-1) == 1:
+            #        target = target.squeeze(-1)
             output = model(data)
             total_samples += data.shape[0]
             loss = criterion(output, target)

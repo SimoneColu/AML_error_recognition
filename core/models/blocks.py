@@ -118,68 +118,21 @@ class PositionalEncodingLearn(nn.Module):
 
 # ! ADDED NEW LSTM BASELINE 
 class LSTMBaseline(nn.Module):
-    """
-    LSTM baseline potenziata (V4).
-    Molto più forte della V3.
-    """
-    def __init__(
-        self,
-        input_size,
-        hidden_size=256,
-        num_layers=2,
-        bidirectional=True,
-        dropout=0.3
-    ):
+    def __init__(self, input_size, hidden_size):
         super().__init__()
-
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.bidirectional = bidirectional
 
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=bidirectional,
-            dropout=dropout if num_layers > 1 else 0.0
+            batch_first=True
         )
 
-        num_dirs = 2 if bidirectional else 1
-
-        # Normalizzazione sull’hidden finale concatenato
-        self.norm = nn.LayerNorm(hidden_size * num_dirs)
-
-        # MLP finale molto più potente
-        self.fc = nn.Sequential(
-            nn.Linear(hidden_size * num_dirs, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-
-            nn.Linear(hidden_size, hidden_size // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-
-            nn.Linear(hidden_size // 2, 1)
-        )
+        self.fc = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
-        # Accetta anche input (B, D)
         if x.dim() == 2:
-            x = x.unsqueeze(1)  # (B,1,D)
+            x = x.unsqueeze(1)  # (B, 1, D)
 
-        # LSTM
         _, (h_n, _) = self.lstm(x)
-        # h_n shape = (num_layers * num_dirs, B, hidden)
-
-        # prendiamo *ultimo layer* di entrambi i lati (fw+bw)
-        last_h = torch.cat(
-            [h_n[-2], h_n[-1]], dim=1
-        ) if self.bidirectional else h_n[-1]
-
-        # Normalizzazione
-        last_h = self.norm(last_h)
-
-        # Classifier
-        logits = self.fc(last_h).squeeze(-1)
-        return logits
+        last_h = h_n[-1]
+        return self.fc(last_h).squeeze(-1)
