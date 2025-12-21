@@ -23,13 +23,19 @@ from dataloader.CaptainCookSubStepDataset import CaptainCookSubStepDataset
 def fetch_model_name(config):
     if config.task_name == const.ERROR_CATEGORY_RECOGNITION:
         return fetch_model_name_ecr(config)
-    elif config.task_name in  [const.EARLY_ERROR_RECOGNITION, const.ERROR_RECOGNITION]:
+    elif config.task_name in [const.EARLY_ERROR_RECOGNITION, const.ERROR_RECOGNITION]:
         if config.model_name is None:
-            if config.backbone in [const.RESNET3D, const.X3D, const.SLOWFAST, const.OMNIVORE]:
+            # --- Aggiungi const.EGOVLP alla lista ---
+            if config.backbone in [const.RESNET3D, const.X3D, const.SLOWFAST, const.OMNIVORE, const.EGOVLP]:
                 config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{config.modality[0]}"
             elif config.backbone == const.IMAGEBIND:
                 combined_modality_name = '_'.join(config.modality)
                 config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{combined_modality_name}"
+            
+            # ---- Aggiunto: Fallback generico per evitare crash se aggiungi altre backbone in futuro
+            else:
+                 config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{config.modality[0]}"
+
     return config.model_name
 
 
@@ -44,11 +50,11 @@ def fetch_model_name_ecr(config):
 def fetch_model(config):
     model = None
     if config.variant == const.MLP_VARIANT:
-        if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND]:
+        if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND, const.EGO_VLP]:
             input_dim = fetch_input_dim(config)
             model = MLP(input_dim, 512, 1)
     elif config.variant == const.TRANSFORMER_VARIANT:
-        if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND]:
+        if config.backbone in [const.OMNIVORE, const.RESNET3D, const.X3D, const.SLOWFAST, const.IMAGEBIND, const.EGO_VLP]:
             model = ErFormer(config)
 
     assert model is not None, f"Model not found for variant: {config.variant} and backbone: {config.backbone}"
