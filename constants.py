@@ -42,6 +42,7 @@ class Constants:
     X3D = "x3d"
     SLOWFAST = "slowfast"
     IMAGEBIND = "imagebind"
+    EGO_VLP = "ego_vlp" # Aggiunta EGOVLP
 
     MLP_VARIANT = "MLP"
     TRANSFORMER_VARIANT = "Transformer"
