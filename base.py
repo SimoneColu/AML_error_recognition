@@ -282,7 +282,14 @@ def train_step_test_step_dataset_base(config):
     print(config.args)
     print("-------------------------------------------------------------")
 
-    train_dataset = CaptainCookStepDataset(config, const.TRAIN, config.split)
+    # DIFFERENZIAZIONE LOGICA:
+    if config.variant == "V1":
+        # Per la MLP: alleniamo sui singoli frammenti (sub-steps)
+        train_dataset = CaptainCookSubStepDataset(config, const.TRAIN, config.split)
+    else:
+        # Per V2/RNN: abbiamo bisogno dell'intero STEP (sequenza) anche nel training
+        # altrimenti il Transformer non ha sequenze su cui imparare!
+        train_dataset = CaptainCookStepDataset(config, const.TRAIN, config.split)
     train_loader = DataLoader(train_dataset, collate_fn=collate_fn, **train_kwargs)
     val_dataset = CaptainCookStepDataset(config, const.VAL, config.split)
     val_loader = DataLoader(val_dataset, collate_fn=collate_fn, **test_kwargs)
