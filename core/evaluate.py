@@ -73,19 +73,23 @@ if __name__ == "__main__":
     parser.add_argument("--modality", type=str, choices=[const.VIDEO])
     parser.add_argument("--ckpt", type=str, required=False) # Aggiunta: reso opzionale per training
     parser.add_argument("--threshold", type=float, required=False, default=0.5) # Aggiunta: reso opzionale per training
-    args = parser.parse_args()
 
     # aggiunta parametri di training ---------------------------
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning Rate")
     parser.add_argument("--epochs", type=int, default=50, help="Numero di epoche")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     # -----------------------------
+
+    args = parser.parse_args()
     conf = Config()
     conf.split = args.split
     conf.backbone = args.backbone
     conf.variant = args.variant
     conf.phase = args.phase
-    conf.modality = args.modality
+    if isinstance(args.modality, list) == True:
+        conf.modality = args.modality 
+    else: 
+        conf.modality = [args.modality]
     conf.ckpt_directory = args.ckpt
 
     # aggiunta nuova configurazione per training------------------ 

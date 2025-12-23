@@ -220,9 +220,12 @@ def train_model_base(train_loader, val_loader, config, test_loader=None):
                 test_losses, test_sub_step_metrics, test_step_metrics = test_er_model(model, test_loader, criterion,
                                                                                       device, phase='test')
 
-            avg_train_loss = sum(train_losses) / len(train_losses)
-            avg_val_loss = sum(val_losses) / len(val_losses)
-            avg_test_loss = sum(test_losses) / len(test_losses)
+            # aggiunto controllo per divisione con zero----
+            avg_train_loss = sum(train_losses) / len(train_losses) if len(train_losses) > 0 else 0
+            avg_val_loss = sum(val_losses) / len(val_losses) if len(val_losses) > 0 else 0
+            
+            avg_test_loss = sum(test_losses) / len(test_losses) if len(test_losses) > 0 else 0
+            # -----------------
 
             precision = step_metrics['precision']
             recall = step_metrics['recall']
