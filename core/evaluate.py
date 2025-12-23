@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 from torch.utils.data import DataLoader
 
-from base import fetch_model, test_er_model, train_sub_step_test_step_dataset_base, train_model_base
+from base import fetch_model, test_er_model, train_sub_step_test_step_dataset_base, train_model_base, train_step_test_step_dataset_base
 from constants import Constants as const
 from dataloader.CaptainCookStepDataset import CaptainCookStepDataset, collate_fn
 
@@ -46,17 +46,16 @@ def eval_er(config, threshold):
     test_er_model(model, test_loader, criterion, config.device, phase="test", step_normalization=True, sub_step_normalization=True, threshold=threshold)
 
 # Aggiunta funzione per trainare il modello su EGOVLP-----------------
-def train_egovlp(config):
-    # 1. Prepara i Dataloader
-    # Usa la funzione che abbiamo visto nell'altro file. 
-    # Questa prepara train (sub-step) e val/test (step-level)
-    train_loader, val_loader, test_loader = train_sub_step_test_step_dataset_base(config)
-
-    # --- BLOCCO DI VERIFICA ---
-    print("Verifica Dimensioni Feature...")
-    data_batch, target_batch, _ = next(iter(train_loader))
-    print(f"Shape dell'input (Feature): {data_batch.shape}")
-    print("uso la backbone: ", conf.backbone)
+def train_er(config):
+    #Caricamento DataLoader
+    if config.variant == const.MLP_VARIANT:
+        print(f"Configurazione rilevata: Baseline V1 (MLP). Caricamento SubStepDataset...")
+        train_loader, val_loader, test_loader = train_sub_step_test_step_dataset_base(config)  
+    elif config.variant == const.TRANSFORMER_VARIANT:
+        print(f"Configurazione rilevata: Baseline V2 (Transformer). Caricamento StepDataset...")
+        train_loader, val_loader, test_loader = train_step_test_step_dataset_base(config)
+    else:
+        raise ValueError(f"Variante non supportata: {config.variant}. Usa 'V1' o 'V2'.")
 
     # 2. Avvia il Training
     # Questa funzione gestisce epoche, loss, optimizer e salvataggio
@@ -68,7 +67,7 @@ def train_egovlp(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", type=str, choices=[const.STEP_SPLIT, const.RECORDINGS_SPLIT], required=True)
-    parser.add_argument("--backbone", type=str, choices=[const.SLOWFAST, const.OMNIVORE], required=True)
+    parser.add_argument("--backbone", type=str, choices=[const.SLOWFAST, const.OMNIVORE, const.EGOVLP], required=True)
     parser.add_argument("--variant", type=str, choices=[const.MLP_VARIANT, const.TRANSFORMER_VARIANT], required=True)
     parser.add_argument("--phase", type=str, choices=[const.TEST, const.TRAIN], default=const.TEST) # Aggiunta fase train
     parser.add_argument("--modality", type=str, choices=[const.VIDEO])
@@ -104,10 +103,8 @@ if __name__ == "__main__":
 
     # aggiunta LOGICA DI SELEZIONE ---
     if conf.phase == const.TRAIN:
-        print(f"Avvio TRAINING: Backbone={conf.backbone}, Variant={conf.variant}, Epochs={conf.num_epochs}")
-        # Dove salvero i checkpoint
-        conf.ckpt_directory = "checkpoint_egoVLP/" 
-        train_egovlp(conf)
+        print(f"Avvio TRAINING: Backbone={conf.backbone}, Variant={conf.variant}, Epochs={conf.num_epochs}") 
+        train_er(conf)
         
     elif conf.phase == const.TEST:
         if not args.ckpt:

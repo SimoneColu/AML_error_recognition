@@ -14,10 +14,12 @@ class Config(object):
         self.phase = "train"
         self.segment_length = 1
 
-        # Use this for 1 sec video features
-        self.segment_features_directory = "data/"
+        # Use this for sub-segment features
+        
+        data_root = "/content/drive/MyDrive/AML_DAAI_25_26/data/"
+        self.video_features_directory = data_root
 
-        self.ckpt_directory = "/data/rohith/captain_cook/checkpoints/"
+        self.ckpt_directory = "/content/drive/MyDrive/AML_DAAI_25_26/data/checkpoints/"
         self.split = "recordings"
         self.batch_size = 1
         self.test_batch_size = 1
