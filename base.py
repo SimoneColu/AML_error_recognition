@@ -25,7 +25,7 @@ def fetch_model_name(config):
         return fetch_model_name_ecr(config)
     elif config.task_name in [const.EARLY_ERROR_RECOGNITION, const.ERROR_RECOGNITION]:
         if config.model_name is None:
-            # --- Aggiungi const.EGOVLP alla lista ---
+            # --- Aggiunta const.EGOVLP alla lista ---
             if config.backbone in [const.RESNET3D, const.X3D, const.SLOWFAST, const.OMNIVORE, const.EGOVLP]:
                 config.model_name = f"{config.task_name}_{config.split}_{config.backbone}_{config.variant}_{config.modality[0]}"
             elif config.backbone == const.IMAGEBIND:
