@@ -30,6 +30,8 @@ class Constants:
     ERROR_RECOGNITION = "error_recognition"
     ERROR_CATEGORY_RECOGNITION = "error_category_recognition"
     EARLY_ERROR_RECOGNITION = "early_error_recognition"
+    ## added modality for extension
+    TASK_VERIFICATION = "task_verification"
 
     RECORDINGS_SPLIT = "recordings"
     PERSON_SPLIT = "person"

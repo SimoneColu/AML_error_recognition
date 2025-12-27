@@ -18,6 +18,10 @@ class Config(object):
         self.segment_features_directory = "data/"
 
         self.ckpt_directory = "/data/rohith/captain_cook/checkpoints/"
+
+        # to get the path for features (extension substep 2)
+        self.recipe_features_path = "data/recipe_features.pkl"
+
         self.split = "recordings"
         self.batch_size = 1
         self.test_batch_size = 1
@@ -60,6 +64,10 @@ class Config(object):
         parser.add_argument("--weight_decay", type=float, default=1e-3, help="weight decay")
         parser.add_argument("--ckpt", type=str, default=None, help="checkpoint path")
         parser.add_argument("--seed", type=int, default=42, help="random seed (default: 1000)")
+
+        # to get the path to the recipe features from the arguments
+        parser.add_argument("--recipe_features_path", type=str, default="data/recipe_features.pkl", 
+                            help="Path to the pickle file containing full recipe features for Task Verification")
 
         parser.add_argument("--backbone", type=str, default=const.OMNIVORE, help="backbone model")
         parser.add_argument("--ckpt_directory", type=str, default="/data/rohith/captain_cook/checkpoints", help="checkpoint directory")
