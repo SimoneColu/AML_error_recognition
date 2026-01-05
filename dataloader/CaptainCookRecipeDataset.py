@@ -20,7 +20,7 @@ class CaptainCookRecipeDataset(Dataset):
         # un elenco (list) di dizionari, oppure un dizionario di dizionari.
         # Qui assumo una lista di campioni per semplicità.
         with open(features_path, 'rb') as f:
-            self.data = pickle.load(f)
+            self.data = np.load(f, allow_pickle=True)
             
         # Se self.data è un dizionario {video_id: content}, lo convertiamo in lista
         if isinstance(self.data, dict):
