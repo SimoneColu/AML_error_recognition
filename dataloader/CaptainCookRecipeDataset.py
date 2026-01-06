@@ -15,16 +15,23 @@ class CaptainCookRecipeDataset(Dataset):
         """
         super().__init__()
         
-        # Carichiamo il file generato nello script di preprocessing (Substep 1)
-        # Struttura attesa del pickle: 
-        # un elenco (list) di dizionari, oppure un dizionario di dizionari.
-        # Qui assumo una lista di campioni per semplicità.
-        with open(features_path, 'rb') as f:
-            self.data = np.load(f, allow_pickle=True)
-            
-        # Se self.data è un dizionario {video_id: content}, lo convertiamo in lista
+        # Caricamento corretto del .npy
+        self.data = np.load(features_path, allow_pickle=True)
+
+        # Caso 1: array scalare che contiene un dict o una list
+        if isinstance(self.data, np.ndarray) and self.data.shape == ():
+            self.data = self.data.item()
+
+        # Caso 2: dict {video_id: sample}
         if isinstance(self.data, dict):
             self.data = list(self.data.values())
+
+        # Controllo di sicurezza
+        if not isinstance(self.data, (list, tuple)):
+            raise TypeError(
+                f"Formato non supportato: {type(self.data)}. "
+                "Atteso list o dict di sample."
+            )
 
     def __len__(self):
         return len(self.data)
