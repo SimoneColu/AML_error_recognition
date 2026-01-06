@@ -28,7 +28,7 @@ def train_task_verification_loop(config):
     full_dataset = CaptainCookRecipeDataset(features_path=features_path)
 
     # ---------------- DEBUG MODE ----------------
-    DEBUG = True            # False per run completo
+    DEBUG = False            # False per run completo
     DEBUG_NUM_RECIPES = 10  # 10–20 ideale
 
     if DEBUG:
