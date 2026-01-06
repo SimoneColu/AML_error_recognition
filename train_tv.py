@@ -71,6 +71,7 @@ def train_task_verification_loop(config):
         # Addestriamo per N epoche su (K-1) ricette
         model.train()
         for epoch in range(config.num_epochs):
+            epoch_loss = 0.0
             for batch in train_loader:
                 features, labels, masks, _ = batch
                 
