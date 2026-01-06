@@ -7,6 +7,8 @@ import wandb
 import numpy as np
 from tqdm import tqdm
 
+import os
+
 # Importa i moduli base esistenti (per coerenza e utilità comuni)
 from base import fetch_model_name
 from core.config import Config
@@ -37,15 +39,30 @@ def train_task_verification_loop(config):
         print(f"[DEBUG MODE] Using only {len(full_dataset)} recipes")
     # --------------------------------------------
 
-    num_samples = len(full_dataset)
+    preds_dir = os.path.join(config.ckpt_directory, "loo_predictions")
+    os.makedirs(preds_dir, exist_ok=True)
 
-    results = []
+    # Liste globali
+    global_y_true = []
+    global_y_pred = []
+
+    num_samples = len(full_dataset)
     print(f"Starting Leave-One-Out Cross Validation on {num_samples} recipes...")
 
     # 2. Loop Leave-One-Out: Itera su ogni ricetta
     # k è l'indice della ricetta che useremo come TEST in questa iterazione
     for k in tqdm(range(num_samples), desc="LOO Folds"):
+
+        metric_path = os.path.join(preds_dir, f"fold_{k}_metrics.pt")
+        fold_ckpt = f"{config.ckpt_directory}/recipe_verifier_fold{k}.pt"
         
+        # Se Abbiamo già i risultati finali (metriche) Skippiamo il fold
+        if os.path.exists(metric_path):
+            saved_data = torch.load(metric_path)
+            global_y_true.append(saved_data['label'])
+            global_y_pred.append(saved_data['pred'])
+            continue
+
         # --- Data Splitting ---
         indices = list(range(num_samples))
         test_idx = [indices.pop(k)] # Rimuovi l'indice k e usalo per il test
@@ -56,56 +73,47 @@ def train_task_verification_loop(config):
         
         # DataLoader specifici per questo fold
         # Nota: batch_size basso per il training dato che sono pochi dati
-        train_loader = DataLoader(train_subset, batch_size=config.batch_size, 
-                                  shuffle=True, collate_fn=recipe_collate_fn)
+        
         test_loader = DataLoader(test_subset, batch_size=1, 
                                  shuffle=False, collate_fn=recipe_collate_fn)
         
         # --- Model Initialization ---
         # Reinizializziamo il modello da zero ad ogni fold per non avere data leakage
         model = RecipeVerifier(config).to(config.device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-        criterion = nn.BCEWithLogitsLoss()
-        
-        # --- Inner Training Loop ---
-        # Addestriamo per N epoche su (K-1) ricette
-        model.train()
-        for epoch in range(config.num_epochs):
-            epoch_loss = 0.0
-            for batch in train_loader:
-                features, labels, masks, _ = batch
-                
-                features = features.to(config.device)
-                labels = labels.to(config.device).unsqueeze(1) # [Batch, 1]
-                masks = masks.to(config.device)
-                
-                optimizer.zero_grad()
-                outputs = model(features, masks)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
+        # 2. CASO B: Abbiamo i PESI salvati (Solo Inferenza)
+        if os.path.exists(fold_ckpt):
+            # print(f"[INFO] Found checkpoint for fold {k}. Running inference only.")
+            model.load_state_dict(torch.load(fold_ckpt))
 
-                epoch_loss += loss.item()
-                
-                # --- LOG BATCH ---
-                if config.enable_wandb:
-                    wandb.log({
-                        "fold": k,
-                        "epoch": epoch,
-                        "batch_loss": loss.item()
-                    })
-            # --- LOG EPOCH ---
-            if config.enable_wandb:
-                wandb.log({
-                    "fold": k,
-                    "epoch": epoch,
-                    "epoch_loss": epoch_loss / len(train_loader)
-                })
-        
-        fold_ckpt = f"{config.ckpt_directory}/recipe_verifier_fold{k}.pt"
-        torch.save(model.state_dict(), fold_ckpt)
-        #print(f"Saved model weights for fold {k} at {fold_ckpt}")
-        
+            # Flag per indicare che dobbiamo cancellare il file dopo l'uso
+            should_delete_ckpt = True
+            
+            # Non serve definire optimizer o fare loop di training qui!
+            
+        # 3. CASO C: Non abbiamo nulla (Training Completo)
+        else:
+            # print(f"[INFO] No checkpoint for fold {k}. Training from scratch.")
+            train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
+            
+            optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+            criterion = nn.BCEWithLogitsLoss()
+            
+            model.train()
+            for epoch in range(config.num_epochs):
+                for batch in train_loader:
+                    features, labels, masks, _ = batch
+                    features = features.to(config.device)
+                    labels = labels.to(config.device).unsqueeze(1)
+                    masks = masks.to(config.device)
+                    
+                    optimizer.zero_grad()
+                    outputs = model(features, masks)
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
+
+            should_delete_ckpt = False
+
         # --- Single Step Evaluation ---
         # Testiamo sulla k-esima ricetta
         model.eval()
@@ -120,21 +128,95 @@ def train_task_verification_loop(config):
                 
                 # Predizione binaria (Logits > 0 equivale a Sigmoid > 0.5)
                 preds = (logits > 0).float()
+
+                val_label = labels.item()
+                val_pred = preds.item()
+                val_logit = logits.item()
+
+                # Salviamo subito le metriche leggere per non dover rifare questo fold
+                fold_metrics = {
+                    'fold': k,
+                    'label': val_label,
+                    'pred': val_pred,
+                    'logits': val_logit
+                }
+                torch.save(fold_metrics, metric_path)
                 
-                is_correct = (preds == labels).item()
-                results.append(is_correct)
+                # 2. Accumula in memoria (per calcolo finale oggi)
+                global_y_true.append(val_label)
+                global_y_pred.append(val_pred)
+        
+        # --- PULIZIA FINALE DEL FOLD ---
+        # Se abbiamo caricato un file dal disco (Caso B), ora lo eliminiamo per sempre
+        if should_delete_ckpt and os.path.exists(fold_ckpt):
+            try:
+                os.remove(fold_ckpt)
+                # print(f"Deleted old checkpoint: {fold_ckpt}")
+            except OSError as e:
+                print(f"Error deleting {fold_ckpt}: {e}")
+
 
     # --- Final Aggregation ---
-    accuracy = sum(results) / len(results)
+    y_true_arr = np.array(global_y_true)
+    y_pred_arr = np.array(global_y_pred)
+
+    # Evita divisione per zero se liste vuote
+    if len(y_true_arr) > 0:
+        accuracy = np.mean(y_true_arr == y_pred_arr)
+        correct_count = np.sum(y_true_arr == y_pred_arr)
+    else:
+        accuracy = 0.0
+        correct_count = 0
+
     print(f"\nTask Verification Results:")
-    print(f"Total Recipes: {len(results)}")
-    print(f"Correct Predictions: {sum(results)}")
+    print(f"Total Recipes Processed: {len(y_true_arr)}")
+    print(f"Correct Predictions: {correct_count}")
     print(f"Final Accuracy: {accuracy:.4f}")
 
     if config.enable_wandb:
         wandb.log({"tv_loo_accuracy": accuracy})
 
-    torch.save(model.state_dict(), f"{config.ckpt_directory}/recipe_verifier_final.pt")
+    
+    # ==========================================
+    # FASE 2: FINAL FULL TRAINING (Tutti i dati)
+    # ==========================================
+    print("\nStarting final training on ALL data (Production Model)...")
+    
+    # Dataset completo senza split
+    full_loader = DataLoader(full_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
+    
+    # Nuovo modello pulito
+    final_model = RecipeVerifier(config).to(config.device)
+    optimizer = torch.optim.Adam(final_model.parameters(), lr=config.lr)
+    criterion = nn.BCEWithLogitsLoss()
+    
+    final_model.train()
+    for epoch in range(config.num_epochs):
+        epoch_loss = 0.0
+        for batch in full_loader:
+            features, labels, masks, _ = batch
+            features = features.to(config.device)
+            labels = labels.to(config.device).unsqueeze(1)
+            masks = masks.to(config.device)
+            
+            optimizer.zero_grad()
+            outputs = final_model(features, masks)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+            
+        if config.enable_wandb and epoch % 5 == 0:
+             wandb.log({"final_training_loss": epoch_loss / len(full_loader)})
+
+    # Salvataggio dell'UNICO modello finale
+    final_ckpt_path = f"{config.ckpt_directory}/recipe_verifier_FULL_DATASET.pt"
+    torch.save(final_model.state_dict(), final_ckpt_path)
+    print(f"✅ Final model saved at: {final_ckpt_path}")
+    
+    if config.enable_wandb:
+        wandb.save(final_ckpt_path)
+
 
 
 def main():
