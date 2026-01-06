@@ -63,5 +63,7 @@ class RecipeVerifier(nn.Module):
         # 4. Binary Classification
         x = self.decoder(x)                                     # (B,1)
 
+        return x
+
 
 
