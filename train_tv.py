@@ -104,7 +104,7 @@ def train_task_verification_loop(config):
         
         fold_ckpt = f"{config.ckpt_directory}/recipe_verifier_fold{k}.pt"
         torch.save(model.state_dict(), fold_ckpt)
-        print(f"Saved model weights for fold {k} at {fold_ckpt}")
+        #print(f"Saved model weights for fold {k} at {fold_ckpt}")
         
         # --- Single Step Evaluation ---
         # Testiamo sulla k-esima ricetta
