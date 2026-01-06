@@ -83,6 +83,27 @@ def train_task_verification_loop(config):
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
+
+                epoch_loss += loss.item()
+                
+                # --- LOG BATCH ---
+                if config.enable_wandb:
+                    wandb.log({
+                        "fold": k,
+                        "epoch": epoch,
+                        "batch_loss": loss.item()
+                    })
+            # --- LOG EPOCH ---
+            if config.enable_wandb:
+                wandb.log({
+                    "fold": k,
+                    "epoch": epoch,
+                    "epoch_loss": epoch_loss / len(train_loader)
+                })
+        
+        fold_ckpt = f"{config.ckpt_directory}/recipe_verifier_fold{k}.pt"
+        torch.save(model.state_dict(), fold_ckpt)
+        print(f"Saved model weights for fold {k} at {fold_ckpt}")
         
         # --- Single Step Evaluation ---
         # Testiamo sulla k-esima ricetta
@@ -111,6 +132,8 @@ def train_task_verification_loop(config):
 
     if config.enable_wandb:
         wandb.log({"tv_loo_accuracy": accuracy})
+
+    torch.save(model.state_dict(), f"{config.ckpt_directory}/recipe_verifier_final.pt")
 
 
 def main():
