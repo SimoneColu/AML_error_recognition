@@ -24,11 +24,22 @@ def train_task_verification_loop(config):
     # 1. Carica il dataset completo (tutte le ricette)
     # Assumiamo che config abbia un campo per il path, altrimenti mettilo hardcoded o nei constants
     features_path = getattr(config, 'recipe_features_path', 'recipe_features.pkl') 
+    # 1. Dataset completo
     full_dataset = CaptainCookRecipeDataset(features_path=features_path)
-    
+
+    # ---------------- DEBUG MODE ----------------
+    DEBUG = True            # False per run completo
+    DEBUG_NUM_RECIPES = 10  # 10–20 ideale
+
+    if DEBUG:
+        indices = list(range(min(DEBUG_NUM_RECIPES, len(full_dataset))))
+        full_dataset = torch.utils.data.Subset(full_dataset, indices)
+        print(f"[DEBUG MODE] Using only {len(full_dataset)} recipes")
+    # --------------------------------------------
+
     num_samples = len(full_dataset)
-    results = [] # Per salvare True/False per ogni ricetta
-    
+
+    results = []
     print(f"Starting Leave-One-Out Cross Validation on {num_samples} recipes...")
 
     # 2. Loop Leave-One-Out: Itera su ogni ricetta
