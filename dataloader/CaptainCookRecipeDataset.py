@@ -61,11 +61,12 @@ class CaptainCookRecipeDataset(Dataset):
         # Assumiamo siano salvate come tensori o numpy array
         features = torch.tensor(sample['features'], dtype=torch.float32)
         
-        # Recupera la label (0 = Corretto, 1 = Errato o viceversa in base alla tua convenzione)
-        label = torch.tensor(sample['label'], dtype=torch.float32)
-        
         # Opzionale: ritorniamo anche l'ID per tracciare quale ricetta stiamo analizzando
-        video_id = sample.get('video_id', str(idx))
+        video_id = sample.get('recording_id', str(idx))
+
+        # Recupera la label (0 = Corretto, 1 = Errato o viceversa in base alla tua convenzione)
+        raw_label = self.video_id_error_map[video_id] 
+        label = torch.tensor(raw_label, dtype=torch.float32)
 
         return features, label, video_id
 
