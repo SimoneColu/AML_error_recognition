@@ -64,6 +64,15 @@ class CaptainCookRecipeDataset(Dataset):
         # Opzionale: ritorniamo anche l'ID per tracciare quale ricetta stiamo analizzando
         video_id = sample.get('recording_id', str(idx))
 
+        # --- DEBUG ---
+        if video_id not in self.video_id_error_map:
+            print(f"ERRORE CRITICO ALL'INDICE {idx}:")
+            print(f"  -> ID cercato: '{video_id}'")
+            print(f"  -> Esempi di chiavi valide nel dizionario: {list(self.video_id_error_map.keys())[:5]}")
+            # Se vuoi evitare il crash immediato per vedere gli altri errori, decommenta:
+            # return features, torch.tensor([0.0]), video_id 
+        # -------------
+
         # Recupera la label (0 = Corretto, 1 = Errato o viceversa in base alla tua convenzione)
         raw_label = self.video_id_error_map[video_id] 
         label = torch.tensor(raw_label, dtype=torch.float32)
