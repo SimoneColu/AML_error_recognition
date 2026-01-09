@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 import pickle
 import numpy as np
+import json
 
 class CaptainCookRecipeDataset(Dataset):
     def __init__(self, features_path):
@@ -10,13 +11,23 @@ class CaptainCookRecipeDataset(Dataset):
         Carica le feature pre-calcolate a livello di ricetta.
         
         Args:
-            features_path (str): Percorso al file .pkl creato nel Substep 1
-                                 contenente dizionario {video_id: {'features': ..., 'label': ...}}
+            features_path (str): Percorso al file .npy creato nel Substep 1
+                                 contenente dizionario {videoid_start_end: "features"}
         """
         super().__init__()
         
         # Caricamento corretto del .npy
         self.data = np.load(features_path, allow_pickle=True)
+
+        with open('annotations/annotation_json/error_annotations.json', 'r') as f:
+            self._error_annotations = json.load(f)
+
+        # Crea la mappa {recording_id: is_error} (o label numerica)
+        # Nota: Assicuriamoci che gli ID coincidano con quelli del filename
+        self.video_id_error_map = {
+            item['recording_id']: (1.0 if item['is_error'] else 0.0) 
+            for item in self._error_annotations
+        }
 
         # Caso 1: array scalare che contiene un dict o una list
         if isinstance(self.data, np.ndarray) and self.data.shape == ():

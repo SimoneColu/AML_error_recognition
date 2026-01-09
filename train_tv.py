@@ -54,7 +54,6 @@ def train_task_verification_loop(config):
     for k in tqdm(range(num_samples), desc="LOO Folds"):
 
         metric_path = os.path.join(preds_dir, f"fold_{k}_metrics.pt")
-        fold_ckpt = f"{config.ckpt_directory}/recipe_verifier_fold{k}.pt"
         
         # Se Abbiamo già i risultati finali (metriche) Skippiamo il fold
         if os.path.exists(metric_path):
@@ -80,39 +79,27 @@ def train_task_verification_loop(config):
         # --- Model Initialization ---
         # Reinizializziamo il modello da zero ad ogni fold per non avere data leakage
         model = RecipeVerifier(config).to(config.device)
-        # 2. CASO B: Abbiamo i PESI salvati (Solo Inferenza)
-        if os.path.exists(fold_ckpt):
-            # print(f"[INFO] Found checkpoint for fold {k}. Running inference only.")
-            model.load_state_dict(torch.load(fold_ckpt))
+        
+       
+        train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
+        
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+        criterion = nn.BCEWithLogitsLoss()
+        
+        model.train()
+        for epoch in range(config.num_epochs):
+            for batch in train_loader:
+                features, labels, masks, _ = batch
+                features = features.to(config.device)
+                labels = labels.to(config.device).unsqueeze(1)
+                masks = masks.to(config.device)
+                
+                optimizer.zero_grad()
+                outputs = model(features, masks)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-            # Flag per indicare che dobbiamo cancellare il file dopo l'uso
-            should_delete_ckpt = True
-            
-            # Non serve definire optimizer o fare loop di training qui!
-            
-        # 3. CASO C: Non abbiamo nulla (Training Completo)
-        else:
-            # print(f"[INFO] No checkpoint for fold {k}. Training from scratch.")
-            train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
-            
-            optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-            criterion = nn.BCEWithLogitsLoss()
-            
-            model.train()
-            for epoch in range(config.num_epochs):
-                for batch in train_loader:
-                    features, labels, masks, _ = batch
-                    features = features.to(config.device)
-                    labels = labels.to(config.device).unsqueeze(1)
-                    masks = masks.to(config.device)
-                    
-                    optimizer.zero_grad()
-                    outputs = model(features, masks)
-                    loss = criterion(outputs, labels)
-                    loss.backward()
-                    optimizer.step()
-
-            should_delete_ckpt = False
 
         # --- Single Step Evaluation ---
         # Testiamo sulla k-esima ricetta
@@ -145,15 +132,6 @@ def train_task_verification_loop(config):
                 # 2. Accumula in memoria (per calcolo finale oggi)
                 global_y_true.append(val_label)
                 global_y_pred.append(val_pred)
-        
-        # --- PULIZIA FINALE DEL FOLD ---
-        # Se abbiamo caricato un file dal disco (Caso B), ora lo eliminiamo per sempre
-        if should_delete_ckpt and os.path.exists(fold_ckpt):
-            try:
-                os.remove(fold_ckpt)
-                # print(f"Deleted old checkpoint: {fold_ckpt}")
-            except OSError as e:
-                print(f"Error deleting {fold_ckpt}: {e}")
 
 
     # --- Final Aggregation ---
@@ -221,13 +199,10 @@ def train_task_verification_loop(config):
 
 def main():
     conf = Config()
-    # Possiamo definire un nome task custom se necessario in constants, 
-    # oppure usare una stringa libera
+
     conf.task_name = const.TASK_VERIFICATION
     
     if conf.model_name is None:
-        # Nota: fetch_model_name potrebbe aspettarsi task standard, 
-        # potresti dover settare un nome manuale se dà errore
         conf.model_name = "RecipeVerifier"
 
     if conf.enable_wandb:
