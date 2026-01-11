@@ -51,7 +51,7 @@ def train_task_verification_loop(config):
 
     # 2. Loop Leave-One-Out: Itera su ogni ricetta
     # k è l'indice della ricetta che useremo come TEST in questa iterazione
-    for k in tqdm(range(num_samples), desc="LOO Folds"):
+    for k in tqdm(range(num_samples)[:50], desc="LOO Folds"):
 
         metric_path = os.path.join(preds_dir, f"fold_{k}_metrics.pt")
         
