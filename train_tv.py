@@ -51,7 +51,7 @@ def train_task_verification_loop(config):
 
     # 2. Loop Leave-One-Out: Itera su ogni ricetta
     # k è l'indice della ricetta che useremo come TEST in questa iterazione
-    for k in tqdm(range(num_samples)[:50], desc="LOO Folds"):
+    for k in tqdm(range(num_samples), desc="LOO Folds"):
 
         metric_path = os.path.join(preds_dir, f"fold_{k}_metrics.pt")
         
@@ -133,6 +133,28 @@ def train_task_verification_loop(config):
                 global_y_true.append(val_label)
                 global_y_pred.append(val_pred)
 
+        # --- Reporting Intermedio ---
+        if k > 0 and k % 10 == 0:
+            print(f"\n--- Intermediate results at fold {k} ---")
+            
+            # Conversione sicura in array numpy
+            np_true = np.array(global_y_true)
+            np_pred = np.array(global_y_pred)
+            
+            correct_count = sum(1 for true, pred in zip(global_y_true, global_y_pred) if true == pred)
+            total_count = len(global_y_true)
+            
+            acc = correct_count / total_count if total_count > 0 else 0.0
+            
+            # Mostriamo anche la distribuzione predizioni per capire se predice solo 0 o 1
+            unique, counts = np.unique(np_pred, return_counts=True)
+            pred_dist = dict(zip(unique, counts))
+            
+            print(f"Processed: {len(np_true)}")
+            print(f"Accuracy:  {acc:.4f}")
+            print(f"Correct Prediction: {correct_count}")
+            print(f"Pred Dist: {pred_dist}") # Utile debug: se vedi solo {0: 10} il modello è collassato
+            print("----------------------------------------\n")
 
     # --- Final Aggregation ---
     y_true_arr = np.array(global_y_true)
