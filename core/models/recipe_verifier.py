@@ -13,8 +13,12 @@ class RecipeVerifier(nn.Module):
 
         self.input_dim = 1024
 
-        # Proiezione Omnivore → Transformer
-        self.input_proj = nn.Linear(1792, self.input_dim)
+        self.input_proj = nn.Sequential(
+            nn.Linear(1792, self.input_dim),
+            nn.LayerNorm(self.input_dim),
+            nn.ReLU(),
+            nn.Dropout(0.1)
+        )
 
         ## positional encoding to keep sequence order
         self.positional_encoder = PositionalEncoding(d_model=self.input_dim,dropout=0.1,max_len=5000)
@@ -41,27 +45,26 @@ class RecipeVerifier(nn.Module):
         # pass the mask (src_key_padding_mask) to ignore the padding
         x = self.step_encoder(x, src_key_padding_mask=mask)         # (B,T,1024)
 
-        # 3. Global Average Pooling (Masked)
-        # Non possiamo fare semplicemente x.mean(dim=1) perché includerebbe gli zeri del padding nella media.
+        # --- MAX POOLING --- 
+        # Vogliamo rilevare se c'è ALMENO un errore, quindi il segnale più forte vince.
         
-        # Invertiamo la maschera se necessario: ci serve 1 dove c'è dato, 0 dove c'è padding.
-        # Assumendo che 'mask' sia True per il Padding (standard PyTorch):
-        input_mask_expanded = (~mask).unsqueeze(-1).expand(x.size()).float()
+        # 1. Gestione Padding per Max Pooling
+        # Dobbiamo sostituire i vettori di padding con -infinito, 
+        # altrimenti il max() potrebbe prendere uno 0.0 di padding invece di un valore negativo rilevante.
         
-        # Somma solo i vettori validi
-        sum_embeddings = (x * input_mask_expanded).sum(1)
+        # Espandiamo la maschera per adattarla alle feature: (B, T, 1024)
+        # mask è True dove c'è padding.
+        mask_expanded = mask.unsqueeze(-1).expand(x.size())
         
-        # Conta quanti step validi ci sono per ogni ricetta
-        sum_mask = input_mask_expanded.sum(1)
+        # Riempiamo il padding con un valore molto basso (-1e9)
+        x_masked = x.masked_fill(mask_expanded, -1e9)
         
-        # Evita divisione per zero (clamp)
-        sum_mask = torch.clamp(sum_mask, min=1e-9)
-        
-        # Media corretta
-        x = sum_embeddings / sum_mask
+        # 2. Global Max Pooling
+        # Prendiamo il valore massimo su tutta la sequenza temporale (dim=1)
+        x_max, _ = x_masked.max(dim=1)                  # (B, 1024)
 
         # 4. Binary Classification
-        x = self.decoder(x)                                     # (B,1)
+        x = self.decoder(x_max)                                     # (B,1)
 
         return x
 

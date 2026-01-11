@@ -255,6 +255,8 @@ def train_task_verification_loop(config):
 def main():
     conf = Config()
 
+    conf.print_config()
+
     conf.task_name = const.TASK_VERIFICATION
     
     if conf.model_name is None:
