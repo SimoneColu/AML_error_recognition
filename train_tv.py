@@ -79,6 +79,7 @@ def train_task_verification_loop(config):
         
         model.train()
         for epoch in range(config.num_epochs):
+            epoch_loss = 0
             for batch in train_loader:
                 features, labels, masks, _ = batch
                 features = features.to(config.device)
@@ -93,11 +94,11 @@ def train_task_verification_loop(config):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
                 optimizer.step()
                 
-                epoch_loss_sum += loss.item()
+                epoch_loss += loss.item()
                 num_batches += 1
             
             
-            avg_loss = epoch_loss_sum / num_batches
+            avg_loss = epoch_loss / num_batches
             
             if config.enable_wandb:
                 wandb.log({
