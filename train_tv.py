@@ -75,7 +75,7 @@ def train_task_verification_loop(config):
        
         train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
         
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,weight_decay=1e-4)
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,weight_decay=config.weight_decay)
         criterion = nn.BCEWithLogitsLoss()
 
         # --- SCHEDULER IMPLEMENTATION ---
@@ -158,7 +158,8 @@ def train_task_verification_loop(config):
                     'fold': k,
                     'label': val_label,
                     'pred': val_pred,
-                    'logits': val_logit
+                    'logits': val_logit,
+                    'prob': sigmoid_output
                 }
                 torch.save(fold_metrics, metric_path)
                 
