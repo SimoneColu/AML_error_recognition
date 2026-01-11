@@ -89,6 +89,8 @@ def train_task_verification_loop(config):
             verbose=True,
             min_lr=1e-7
         )
+
+        train_loss_history = [] # to save it in ckpt, useful for debug
         
         model.train()
         for epoch in range(config.num_epochs):
@@ -118,6 +120,8 @@ def train_task_verification_loop(config):
             
             
             avg_loss = epoch_loss / num_batches
+
+            train_loss_history.append(avg_loss)
 
             # --- STEP DELLO SCHEDULER ---
             # Gli passiamo la loss media di questa epoca. 
@@ -159,7 +163,8 @@ def train_task_verification_loop(config):
                     'label': val_label,
                     'pred': val_pred,
                     'logits': val_logit,
-                    'prob': sigmoid_output
+                    'prob': sigmoid_output,
+                    'train_loss_history': train_loss_history,
                 }
                 torch.save(fold_metrics, metric_path)
                 
