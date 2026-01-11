@@ -21,7 +21,7 @@ class RecipeVerifier(nn.Module):
 
         ## transformer encoder
         step_encoder_layer = EncoderLayer(d_model=self.input_dim, dim_feedforward=2048, nhead=8, batch_first=True)
-        self.step_encoder = Encoder(step_encoder_layer, num_layers=4)
+        self.step_encoder = Encoder(step_encoder_layer, num_layers=2)
 
         ## decoder (binary classification)
         self.decoder = MLP(self.input_dim, 512, 1)

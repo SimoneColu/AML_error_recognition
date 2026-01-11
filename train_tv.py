@@ -146,11 +146,11 @@ def train_task_verification_loop(config):
 
                 sigmoid_output = logits.sigmoid()
                 
-                """ # Predizione binaria (Logits > 0 equivale a Sigmoid > 0.5)
-                preds = (logits > 0).float() """
+                # Predizione binaria (Logits > 0 equivale a Sigmoid > 0.5)
+                preds = (sigmoid_output > 0.5).float()
 
                 val_label = labels.item()
-                val_pred = sigmoid_output.item()
+                val_pred = preds.item()
                 val_logit = logits.item()
 
                 # Salviamo subito le metriche leggere per non dover rifare questo fold
@@ -245,7 +245,7 @@ def train_task_verification_loop(config):
     # Salvataggio dell'UNICO modello finale
     final_ckpt_path = f"{config.ckpt_directory}/recipe_verifier_FULL_DATASET.pt"
     torch.save(final_model.state_dict(), final_ckpt_path)
-    print(f"✅ Final model saved at: {final_ckpt_path}")
+    print(f"Final model saved at: {final_ckpt_path}")
     
     if config.enable_wandb:
         wandb.save(final_ckpt_path)
