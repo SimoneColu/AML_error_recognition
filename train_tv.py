@@ -79,7 +79,8 @@ def train_task_verification_loop(config):
         
         model.train()
         for epoch in range(config.num_epochs):
-            epoch_loss = 0
+            epoch_loss = 0.0
+            num_batches = 0
             for batch in train_loader:
                 features, labels, masks, _ = batch
                 features = features.to(config.device)
