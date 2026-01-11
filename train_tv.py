@@ -29,16 +29,6 @@ def train_task_verification_loop(config):
     # 1. Dataset completo
     full_dataset = CaptainCookRecipeDataset(features_path=features_path)
 
-    # ---------------- DEBUG MODE ----------------
-    DEBUG = False            # False per run completo
-    DEBUG_NUM_RECIPES = 10  # 10–20 ideale
-
-    if DEBUG:
-        indices = list(range(min(DEBUG_NUM_RECIPES, len(full_dataset))))
-        full_dataset = torch.utils.data.Subset(full_dataset, indices)
-        print(f"[DEBUG MODE] Using only {len(full_dataset)} recipes")
-    # --------------------------------------------
-
     preds_dir = os.path.join(config.ckpt_directory, "loo_predictions")
     os.makedirs(preds_dir, exist_ok=True)
 
@@ -51,11 +41,12 @@ def train_task_verification_loop(config):
 
     # 2. Loop Leave-One-Out: Itera su ogni ricetta
     # k è l'indice della ricetta che useremo come TEST in questa iterazione
-    for k in tqdm(range(num_samples), desc="LOO Folds"):
+    for k in tqdm(range(num_samples)[:2], desc="LOO Folds"):
 
         metric_path = os.path.join(preds_dir, f"fold_{k}_metrics.pt")
         
         # Se Abbiamo già i risultati finali (metriche) Skippiamo il fold
+        # --- Skipping Logic ---
         if os.path.exists(metric_path):
             saved_data = torch.load(metric_path)
             global_y_true.append(saved_data['label'])
@@ -97,7 +88,12 @@ def train_task_verification_loop(config):
                 optimizer.zero_grad()
                 outputs = model(features, masks)
                 loss = criterion(outputs, labels)
+
+                if config.enable_wandb:
+                    wandb.log({"loss": loss})
+
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
                 optimizer.step()
 
 
@@ -112,12 +108,14 @@ def train_task_verification_loop(config):
                 masks = masks.to(config.device)
                 
                 logits = model(features, masks)
+
+                sigmoid_output = logits.sigmoid()
                 
-                # Predizione binaria (Logits > 0 equivale a Sigmoid > 0.5)
-                preds = (logits > 0).float()
+                """ # Predizione binaria (Logits > 0 equivale a Sigmoid > 0.5)
+                preds = (logits > 0).float() """
 
                 val_label = labels.item()
-                val_pred = preds.item()
+                val_pred = sigmoid_output.item()
                 val_logit = logits.item()
 
                 # Salviamo subito le metriche leggere per non dover rifare questo fold
