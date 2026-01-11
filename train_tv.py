@@ -89,12 +89,22 @@ def train_task_verification_loop(config):
                 outputs = model(features, masks)
                 loss = criterion(outputs, labels)
 
-                if config.enable_wandb:
-                    wandb.log({"loss": loss})
-
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
                 optimizer.step()
+                
+                epoch_loss_sum += loss.item()
+                num_batches += 1
+            
+            
+            avg_loss = epoch_loss_sum / num_batches
+            
+            if config.enable_wandb:
+                wandb.log({
+                    "loss": avg_loss,      # La curva che scende
+                    "epoch": epoch,        # Utile per capire a che punto sei del fold
+                    "fold": k              # Utile per sapere quale fold stai guardando
+                })
 
 
         # --- Single Step Evaluation ---
