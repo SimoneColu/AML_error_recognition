@@ -21,7 +21,7 @@ class RecipeVerifier(nn.Module):
         )
 
         ## positional encoding to keep sequence order
-        self.positional_encoder = PositionalEncoding(d_model=self.input_dim,dropout=0.1,max_len=5000)
+        self.positional_encoder = PositionalEncoding(d_model=self.input_dim,dropout=0.2,max_len=5000)
 
         ## transformer encoder
         step_encoder_layer = EncoderLayer(d_model=self.input_dim, dim_feedforward=2048, nhead=8, batch_first=True)
