@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, Subset
 import wandb
 import numpy as np
 from tqdm import tqdm
+from torch.optim.lr_scheduler import ReduceLROnPlateau  # <--- IMPORTANTE
 
 import os
 
@@ -74,8 +75,20 @@ def train_task_verification_loop(config):
        
         train_loader = DataLoader(train_subset, batch_size=config.batch_size, shuffle=True, collate_fn=recipe_collate_fn)
         
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,weight_decay=1e-4)
         criterion = nn.BCEWithLogitsLoss()
+
+        # --- SCHEDULER IMPLEMENTATION ---
+        # Usiamo mode='min' perché monitoriamo la Loss (che deve scendere)
+        # Patience=5: se la loss non scende per 5 epoche, riduciamo il LR
+        scheduler = ReduceLROnPlateau(
+            optimizer, 
+            mode='min',      
+            factor=0.5,      # Riduciamo della metà
+            patience=5, 
+            verbose=True,
+            min_lr=1e-7
+        )
         
         model.train()
         for epoch in range(config.num_epochs):
@@ -91,6 +104,11 @@ def train_task_verification_loop(config):
                 outputs = model(features, masks)
                 loss = criterion(outputs, labels)
 
+                # Check NaN 
+                if torch.isnan(loss).any():
+                    print(f"Loss NaN at fold {k}, epoch {epoch}. Skipping step.")
+                    continue
+
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
                 optimizer.step()
@@ -100,6 +118,11 @@ def train_task_verification_loop(config):
             
             
             avg_loss = epoch_loss / num_batches
+
+            # --- STEP DELLO SCHEDULER ---
+            # Gli passiamo la loss media di questa epoca. 
+            # Lui deciderà se abbassare il LR per l'epoca successiva.
+            scheduler.step(avg_loss)
             
             if config.enable_wandb:
                 wandb.log({
