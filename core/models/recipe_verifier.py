@@ -11,59 +11,79 @@ class RecipeVerifier(nn.Module):
         super().__init__(*args, **kwargs)
         self.config = config
 
-        self.input_dim = 1024
+        # Configurable Dimensions
+        # Raw Features from step segmentation (S,256)
+        self.input_dim = 256
+        # Internal model dimension 
+        self.internal_dim = 256
 
+        # Projection of the input to the internal dimension
         self.input_proj = nn.Sequential(
-            nn.Linear(1792, self.input_dim),
-            nn.LayerNorm(self.input_dim),
+            nn.Linear(self.input_dim, self.internal_dim),
+            nn.LayerNorm(self.internal_dim),
             nn.ReLU(),
             nn.Dropout(0.1)
         )
 
-        ## positional encoding to keep sequence order
-        self.positional_encoder = PositionalEncoding(d_model=self.input_dim,dropout=0.3,max_len=5000)
+        # Positional encoding to keep sequence order
+        self.positional_encoder = PositionalEncoding(
+            d_model = self.internal_dim,
+            dropout = 0.3,
+            max_len = 5000)
 
-        ## transformer encoder
-        step_encoder_layer = EncoderLayer(d_model=self.input_dim, dim_feedforward=2048, nhead=8, batch_first=True)
-        self.step_encoder = Encoder(step_encoder_layer, num_layers=2)
+        # Transformer encoder
+        step_encoder_layer = EncoderLayer(
+            d_model = self.internal_dim, 
+            dim_feedforward = 512,
+            nhead = 4, 
+            batch_first = True)
+        
+        self.step_encoder = Encoder(
+            step_encoder_layer, 
+            num_layers=2)
 
-        ## decoder (binary classification)
-        self.decoder = MLP(self.input_dim, 512, 1)
+        # Decoder (Binary Classification)
+        # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
+        self.decoder = MLP(self.internal_dim * 2, 256, 1)
 
     def forward(self,x,mask):
+        # x shape: (Batch, Steps, 256)
+        
         # clean the input
-        x = torch.nan_to_num(x, nan=0.0, posinf=1.0, neginf=-1.0)   # (B,T,1792)
+        x = torch.nan_to_num(x, nan=0.0, posinf=1.0, neginf=-1.0)   # (B, T, input_dim)
 
-     
-        x = self.input_proj(x)                                      # (B,T,1024)
+        # Project to internal dimension
+        x = self.input_proj(x)                                      # (B, T, internal_dim)
 
         # add the positional encoder
-        x = self.positional_encoder(x)                              # (B,T,1024)
+        x = self.positional_encoder(x)                              # (B,T,256)
         
-
         # Transformer Encoder
-        # pass the mask (src_key_padding_mask) to ignore the padding
-        x = self.step_encoder(x, src_key_padding_mask=mask)         # (B,T,1024)
+        x = self.step_encoder(x, src_key_padding_mask=mask)         # (B,T,256)
 
-        # --- MAX POOLING --- 
-        # Vogliamo rilevare se c'è ALMENO un errore, quindi il segnale più forte vince.
+        # --- HYBRID POOLING (Max + Avg) --- 
+        # Improves accuracy by capturing both peak errors and general context.
         
-        # 1. Gestione Padding per Max Pooling
-        # Dobbiamo sostituire i vettori di padding con -infinito, 
-        # altrimenti il max() potrebbe prendere uno 0.0 di padding invece di un valore negativo rilevante.
-        
-        # Espandiamo la maschera per adattarla alle feature: (B, T, 1024)
-        # mask è True dove c'è padding.
+        # Mask Preparation
         mask_expanded = mask.unsqueeze(-1).expand(x.size())
         
-        # Riempiamo il padding con un valore molto basso (-1e9)
-        x_masked = x.masked_fill(mask_expanded, -1e9)
+        # Max Pooling (Detects strong error signals)
+        x_masked_max = x.masked_fill(mask_expanded, -1e9)
+        x_max, _ = x_masked_max.max(dim=1)                          # (B, internal_dim)
         
-        # 2. Global Max Pooling
-        # Prendiamo il valore massimo su tutta la sequenza temporale (dim=1)
-        x_max, _ = x_masked.max(dim=1)                  # (B, 1024)
+        # Average Pooling (Captures global context)
+        x_masked_sum = x.masked_fill(mask_expanded, 0.0)
+        x_sum = x_masked_sum.sum(dim=1)          # Sum over steps
 
-        # 4. Binary Classification
+        # Count non-padding steps to divide correctly
+        # (~mask) gives 1 for real data, 0 for padding
+        lengths = (~mask).sum(dim=1, keepdim=True).float() 
+        x_avg = x_sum / lengths.clamp(min=1.0)                      # (B, internal_dim)
+
+        # Concatenate
+        x_cat = torch.cat([x_max, x_avg], dim=1)                    # (B, internal_dim * 2)
+
+        # Binary Classification
         x = self.decoder(x_max)                                     # (B,1)
 
         return x
