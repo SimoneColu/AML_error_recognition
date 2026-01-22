@@ -29,11 +29,15 @@ class CaptainCookRecipeDataset(Dataset):
             for item in self._error_annotations
         }
 
-        # Caso 1: array scalare che contiene un dict o una list
+        # Case 1: Scalar array (0-d) containing a list/dict
         if isinstance(self.data, np.ndarray) and self.data.shape == ():
             self.data = self.data.item()
 
-        # Caso 2: dict {video_id: sample}
+        # Case 2: 1D Numpy Array containing objects 
+        elif isinstance(self.data, np.ndarray):
+            self.data = self.data.tolist()
+
+        # Case 3: Dict {video_id: sample} -> Convert to list
         if isinstance(self.data, dict):
             self.data = list(self.data.values())
 
