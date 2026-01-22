@@ -111,7 +111,6 @@ def train_task_verification_loop(config):
             mode='min',      
             factor=0.5,      # reducing factor
             patience=5, 
-            verbose=True,
             min_lr=1e-7
         )
 
