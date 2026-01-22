@@ -11,6 +11,6 @@ matplotlib
 seaborn
 wandb
 torcheval
-
+loguru
 pyrebase4
 yacs
