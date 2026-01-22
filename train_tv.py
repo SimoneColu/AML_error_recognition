@@ -111,12 +111,14 @@ def train_task_verification_loop(config):
         model = RecipeVerifier(config).to(config.device)
         
        # --- Optimizer and criterion definition ---
+       # If Class 0 is 44% and Class 1 is 56%, weight should be ~1.27 for Class 0
+        pos_weight = torch.tensor([1.27]).to(config.device)
         optimizer = torch.optim.Adam(
             model.parameters(), 
             lr = config.lr,
             weight_decay = config.weight_decay 
             )
-        criterion = nn.BCEWithLogitsLoss()
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
         # --- SCHEDULER IMPLEMENTATION ---
         # mode='min' because we are monitoring the loss (which needs to decrease)

@@ -22,7 +22,7 @@ class RecipeVerifier(nn.Module):
             nn.Linear(self.input_dim, self.internal_dim),
             nn.LayerNorm(self.internal_dim),
             nn.ReLU(),
-            nn.Dropout(0.3)
+            nn.Dropout(self.config.dropout)
         )
 
         # Positional encoding to keep sequence order
@@ -36,7 +36,7 @@ class RecipeVerifier(nn.Module):
             d_model = self.internal_dim, 
             dim_feedforward = 512,
             nhead = 4, 
-            dropout = 0.5,
+            dropout = self.config.dropout,
             batch_first = True)
         
         self.step_encoder = Encoder(
