@@ -15,7 +15,7 @@ class RecipeVerifier(nn.Module):
         # Raw Features from step segmentation (S,256)
         self.input_dim = 256
         # Internal model dimension 
-        self.internal_dim = 256
+        self.internal_dim = 512
 
         # Projection of the input to the internal dimension
         self.input_proj = nn.Sequential(

@@ -53,7 +53,14 @@ def train_task_verification_loop(config):
 
     # We define a 'group' in wandb to easily filter this specific experiment run
     if config.enable_wandb:
-        wandb.config.update({"strategy": "LOO_CrossValidation"})
+        # --- Define Metrics for Overlapping Charts ---
+        # This forces 'train_loss_fold' to always use 'epoch_in_fold' as its X-axis
+        wandb.define_metric("epoch_in_fold")
+        wandb.define_metric("train_loss_fold", step_metric="epoch_in_fold")
+        
+        # This forces the global accuracy to use the fold index as its X-axis
+        wandb.define_metric("folds_processed")
+        wandb.define_metric("running_loo_accuracy", step_metric="folds_processed")
     
     # k is the index of the recipe execution we are testing (so it will not be included in the training)
     for k in tqdm(range(num_samples), desc="LOO Folds"):
@@ -66,6 +73,14 @@ def train_task_verification_loop(config):
             saved_data = torch.load(metric_path)
             global_y_true.append(saved_data['label'])
             global_y_pred.append(saved_data['pred'])
+
+            if config.enable_wandb:
+                curr_acc = np.mean(np.array(global_y_true) == np.array(global_y_pred))
+                wandb.log({
+                    "folds_processed": k,
+                    "running_loo_accuracy": curr_acc
+                })
+
             continue
 
         # --- Data Splitting ---
@@ -153,13 +168,13 @@ def train_task_verification_loop(config):
             # He will decide to wether deacrease the loss for the next epoch
             scheduler.step(avg_loss)
             
-            # wandb logger
+            
             if config.enable_wandb:
                 wandb.log({
-                    "train_loss_epoch":avg_loss,
-                    "loss": avg_loss,      
-                    "epoch": epoch,        
-                    "fold": k              
+                    "train_loss_fold": avg_loss,    # The Y-Axis
+                    "epoch_in_fold": epoch,         # The X-Axis (0 to 10)
+                    "fold_group_id": f"fold_{k}",   # The Grouping Key (Fold 1, Fold 2...)
+                    "lr": optimizer.param_groups[0]['lr']
                 })
 
          
@@ -205,13 +220,12 @@ def train_task_verification_loop(config):
 
         if config.enable_wandb:
             wandb.log({
-                "fold_idx": k,
-                "running_loo_accuracy": running_acc,
-                "fold_correct": 1.0 if val_label == val_pred else 0.0
+                "folds_processed": k,
+                "running_loo_accuracy": running_acc
             })
 
         # --- Intermediate report ---
-        if k > 0 and k % 10 == 0:
+        if k > 0 and k % 1 == 0:
             print(f"\n--- Intermediate results at fold {k} ---")
             
             # Conversione sicura in array numpy
@@ -225,8 +239,8 @@ def train_task_verification_loop(config):
             
             # Pred distribution to show if our model is actually doing prediction or saying always the same label
             unique, counts = np.unique(np_pred, return_counts=True)
-            pred_dist = dict(zip(unique, counts))
-            
+            pred_dist = {k.item(): v.item() for k, v in zip(unique, counts)}    
+
             print(f"Processed: {len(np_true)}")
             print(f"Accuracy:  {acc:.4f}")
             print(f"Correct Prediction: {correct_count}")
