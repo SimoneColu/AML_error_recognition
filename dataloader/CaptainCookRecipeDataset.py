@@ -25,7 +25,7 @@ class CaptainCookRecipeDataset(Dataset):
         # Crea la mappa {video_id: is_error} (o label numerica)
         # Nota: Assicuriamoci che gli ID coincidano con quelli del filename
         self.video_id_error_map = {
-            item['recording_i']: (1.0 if item['is_error'] else 0.0) 
+            item['recording_id']: (1.0 if item['is_error'] else 0.0) 
             for item in self._error_annotations
         }
 
