@@ -28,6 +28,7 @@ class Config(object):
         self.num_epochs = 10
         self.lr = 1e-3
         self.weight_decay = 1e-3
+        self.dropout = 0.1
         self.log_interval = 5
         self.dry_run = False
         self.ckpt = None
@@ -64,6 +65,7 @@ class Config(object):
         parser.add_argument("--weight_decay", type=float, default=1e-3, help="weight decay")
         parser.add_argument("--ckpt", type=str, default=None, help="checkpoint path")
         parser.add_argument("--seed", type=int, default=42, help="random seed (default: 1000)")
+        parser.add_argument("--dropout", type=int, default=0.1, help="dropout of the transformer" )
 
         # to get the path to the recipe features from the arguments
         parser.add_argument("--recipe_features_path", type=str, default="data/recipe_features.pkl", 
