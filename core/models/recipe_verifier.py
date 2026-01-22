@@ -84,7 +84,7 @@ class RecipeVerifier(nn.Module):
         x_cat = torch.cat([x_max, x_avg], dim=1)                    # (B, internal_dim * 2)
 
         # Binary Classification
-        x = self.decoder(x_max)                                     # (B,1)
+        x = self.decoder(x_cat)                                     # (B,1)
 
         return x
 
