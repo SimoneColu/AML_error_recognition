@@ -22,10 +22,10 @@ class CaptainCookRecipeDataset(Dataset):
         with open('annotations/annotation_json/error_annotations.json', 'r') as f:
             self._error_annotations = json.load(f)
 
-        # Crea la mappa {recording_id: is_error} (o label numerica)
+        # Crea la mappa {video_id: is_error} (o label numerica)
         # Nota: Assicuriamoci che gli ID coincidano con quelli del filename
         self.video_id_error_map = {
-            item['recording_id']: (1.0 if item['is_error'] else 0.0) 
+            item['video_id']: (1.0 if item['is_error'] else 0.0) 
             for item in self._error_annotations
         }
 
@@ -62,7 +62,7 @@ class CaptainCookRecipeDataset(Dataset):
         features = torch.tensor(sample['features'], dtype=torch.float32)
         
         # Opzionale: ritorniamo anche l'ID per tracciare quale ricetta stiamo analizzando
-        video_id = sample.get('recording_id', str(idx))
+        video_id = sample.get('video_id', str(idx))
 
         # --- DEBUG ---
         if video_id not in self.video_id_error_map:
