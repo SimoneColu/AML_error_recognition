@@ -281,7 +281,7 @@ def train_task_verification_loop(config):
     final_model = RecipeVerifier(config).to(config.device)
     
     # Optimizer and criterion definition
-    optimizer = torch.optim.Adam(final_model.parameters(), lr=config.lr)
+    optimizer = torch.optim.Adam(final_model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     criterion = nn.BCEWithLogitsLoss()
     
     final_model.train()

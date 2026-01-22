@@ -15,7 +15,7 @@ class RecipeVerifier(nn.Module):
         # Raw Features from step segmentation (S,256)
         self.input_dim = 256
         # Internal model dimension 
-        self.internal_dim = 512
+        self.internal_dim = 1024
 
         # Projection of the input to the internal dimension
         self.input_proj = nn.Sequential(
@@ -28,14 +28,14 @@ class RecipeVerifier(nn.Module):
         # Positional encoding to keep sequence order
         self.positional_encoder = PositionalEncoding(
             d_model = self.internal_dim,
-            dropout = 0.3,
+            dropout = self.config.dropout,
             max_len = 5000)
 
         # Transformer encoder
         step_encoder_layer = EncoderLayer(
             d_model = self.internal_dim, 
-            dim_feedforward = 512,
-            nhead = 4, 
+            dim_feedforward = 2048,
+            nhead = 8, 
             batch_first = True)
         
         self.step_encoder = Encoder(
@@ -44,7 +44,7 @@ class RecipeVerifier(nn.Module):
 
         # Decoder (Binary Classification)
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
-        self.decoder = MLP(self.internal_dim * 2, 256, 1)
+        self.decoder = MLP(self.internal_dim * 2, 512, 1)
 
     def forward(self,x,mask):
         # x shape: (Batch, Steps, 256)
