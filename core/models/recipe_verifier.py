@@ -15,7 +15,7 @@ class RecipeVerifier(nn.Module):
         # Raw Features from step segmentation (S,256)
         self.input_dim = 768
         # Internal model dimension 
-        self.internal_dim = 256
+        self.internal_dim = 64
 
 
         # Projection of the input to the internal dimension
@@ -36,7 +36,7 @@ class RecipeVerifier(nn.Module):
         step_encoder_layer = EncoderLayer(
             d_model = self.internal_dim, 
             dim_feedforward = 128,
-            nhead = 2, 
+            nhead = 4, 
             dropout = self.config.dropout,
             batch_first = True)
         
@@ -48,7 +48,7 @@ class RecipeVerifier(nn.Module):
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
         self.decoder = MLP(
             input_size = self.internal_dim*2,
-            hidden_size = 64, 
+            hidden_size = 32, 
             output_size = 1)
 
     def forward(self,x,mask):
