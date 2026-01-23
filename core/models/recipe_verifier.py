@@ -15,7 +15,8 @@ class RecipeVerifier(nn.Module):
         # Raw Features from step segmentation (S,256)
         self.input_dim = 256
         # Internal model dimension 
-        self.internal_dim = 256
+        self.internal_dim = 128
+
 
         # Projection of the input to the internal dimension
         self.input_proj = nn.Sequential(
@@ -35,7 +36,7 @@ class RecipeVerifier(nn.Module):
         step_encoder_layer = EncoderLayer(
             d_model = self.internal_dim, 
             dim_feedforward = 512,
-            nhead = 4, 
+            nhead = 2, 
             dropout = self.config.dropout,
             batch_first = True)
         
@@ -46,7 +47,7 @@ class RecipeVerifier(nn.Module):
         # Decoder (Binary Classification)
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
         self.decoder = MLP(
-            input_size = self.internal_dim * 2,
+            input_size = self.internal_dim*2,
             hidden_size = 128, 
             output_size = 1)
 
@@ -65,8 +66,29 @@ class RecipeVerifier(nn.Module):
         # Transformer Encoder
         x = self.step_encoder(x, src_key_padding_mask=mask)         # (B,T,256)
 
-        # --- HYBRID POOLING (Max + Avg) --- 
-        # Improves accuracy by capturing both peak errors and general context.
+        # --- HYBRID POOLING ---
+        
+        # 1. Max Pooling (Your original logic)
+        mask_expanded = mask.unsqueeze(-1).expand(x.size())
+        x_masked_max = x.masked_fill(mask_expanded, -1e9)
+        x_max, _ = x_masked_max.max(dim=1)  # (B, 128)
+
+        # 2. Average Pooling (The Stabilizer)
+        # Invert mask: True for Data, False for Padding
+        valid_mask_float = (~mask).unsqueeze(-1).float() 
+        sum_embeddings = torch.sum(x * valid_mask_float, dim=1)
+        sum_mask = torch.clamp(valid_mask_float.sum(dim=1), min=1e-9)
+        x_avg = sum_embeddings / sum_mask   # (B, 128)
+
+        # 3. CONCATENATE
+        x_cat = torch.cat((x_max, x_avg), dim=1) # (B, 256)
+
+        # Classify
+        x = self.decoder(x_cat)
+        return x
+        
+        
+        """ # --- ONLY MAX POOLING --- 
         
         # Mask Preparation
         mask_expanded = mask.unsqueeze(-1).expand(x.size())
@@ -74,23 +96,12 @@ class RecipeVerifier(nn.Module):
         # Max Pooling (Detects strong error signals)
         x_masked_max = x.masked_fill(mask_expanded, -1e9)
         x_max, _ = x_masked_max.max(dim=1)                          # (B, internal_dim)
-        
-        # Average Pooling (Captures global context)
-        x_masked_sum = x.masked_fill(mask_expanded, 0.0)
-        x_sum = x_masked_sum.sum(dim=1)          # Sum over steps
-
-        # Count non-padding steps to divide correctly
-        # (~mask) gives 1 for real data, 0 for padding
-        lengths = (~mask).sum(dim=1, keepdim=True).float() 
-        x_avg = x_sum / lengths.clamp(min=1.0)                      # (B, internal_dim)
-
-        # Concatenate
-        x_cat = torch.cat([x_max, x_avg], dim=1)                    # (B, internal_dim * 2)
 
         # Binary Classification
-        x = self.decoder(x_cat)                                     # (B,1)
+        # We pass x_max directly (size is internal_dim, not internal_dim * 2)
+        x = self.decoder(x_max)                                     # (B,1)
 
-        return x
+        return x """
 
 
 
