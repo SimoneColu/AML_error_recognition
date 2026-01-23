@@ -73,7 +73,7 @@ class RecipeVerifier(nn.Module):
         x_masked_max = x.masked_fill(mask_expanded, -1e9)
         x_max, _ = x_masked_max.max(dim=1)  # (B, 128)
 
-        """ # 2. Average Pooling (The Stabilizer)
+        # 2. Average Pooling (The Stabilizer)
         # Invert mask: True for Data, False for Padding
         valid_mask_float = (~mask).unsqueeze(-1).float() 
         sum_embeddings = torch.sum(x * valid_mask_float, dim=1)
@@ -85,9 +85,9 @@ class RecipeVerifier(nn.Module):
 
         # Classify
         x = self.decoder(x_cat)
-        return x """
+        return x 
         
-        
+        """
        # --- ONLY MAX POOLING --- 
         
         # Mask Preparation
@@ -101,7 +101,7 @@ class RecipeVerifier(nn.Module):
         # We pass x_max directly (size is internal_dim, not internal_dim * 2)
         x = self.decoder(x_max)                                     # (B,1)
 
-        return x 
+        return x """
 
 
 
