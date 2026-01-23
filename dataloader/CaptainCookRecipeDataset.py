@@ -16,14 +16,13 @@ class CaptainCookRecipeDataset(Dataset):
         """
         super().__init__()
         
-        # Caricamento corretto del .npy
+        # Loading .npy
         self.data = np.load(features_path, allow_pickle=True)
 
         with open('annotations/annotation_json/error_annotations.json', 'r') as f:
             self._error_annotations = json.load(f)
 
-        # Crea la mappa {video_id: is_error} (o label numerica)
-        # Nota: Assicuriamoci che gli ID coincidano con quelli del filename
+        # Create the map {video_id: is_error} 
         self.video_id_error_map = {
             item['recording_id']: (1.0 if item['is_error'] else 0.0) 
             for item in self._error_annotations
@@ -41,31 +40,22 @@ class CaptainCookRecipeDataset(Dataset):
         if isinstance(self.data, dict):
             self.data = list(self.data.values())
 
-        # Controllo di sicurezza
+        # Safety Check
         if not isinstance(self.data, (list, tuple)):
             raise TypeError(
-                f"Formato non supportato: {type(self.data)}. "
-                "Atteso list o dict di sample."
+                f"Unsupported format: {type(self.data)}. "
+                "Atteso list o dict di samle."
             )
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        """
-        Restituisce un singolo campione.
-        Output:
-            features: Tensor (Num_Steps, Feature_Dim)
-            label: Float (0.0 o 1.0)
-            video_id: str (utile per debug)
-        """
         sample = self.data[idx]
         
-        # Recupera le feature (sequenza di step)
-        # Assumiamo siano salvate come tensori o numpy array
+        # Retrieve features
         features = torch.tensor(sample['features'], dtype=torch.float32)
         
-        # Opzionale: ritorniamo anche l'ID per tracciare quale ricetta stiamo analizzando
         video_id = sample.get('video_id', str(idx))
 
         # --- DEBUG ---
@@ -73,48 +63,35 @@ class CaptainCookRecipeDataset(Dataset):
             print(f"ERRORE CRITICO ALL'INDICE {idx}:")
             print(f"  -> ID cercato: '{video_id}'")
             print(f"  -> Esempi di chiavi valide nel dizionario: {list(self.video_id_error_map.keys())[:5]}")
-            # Se vuoi evitare il crash immediato per vedere gli altri errori, decommenta:
             # return features, torch.tensor([0.0]), video_id 
         # -------------
 
-        # Recupera la label (0 = Corretto, 1 = Errato o viceversa in base alla tua convenzione)
+        # Get the label (0 = Corect, 1 = Error)
         raw_label = self.video_id_error_map[video_id] 
         label = torch.tensor(raw_label, dtype=torch.float32)
 
         return features, label, video_id
 
 def recipe_collate_fn(batch):
-    """
-    Funzione per gestire batch con ricette di lunghezza diversa.
-    Aggiunge padding (zeri) alle sequenze più corte.
-    
-    Returns:
-        padded_features: (Batch, Max_Len, Feature_Dim)
-        labels: (Batch,)
-        masks: (Batch, Max_Len) -> True se è padding, False se è dato reale
-        ids: list of video_ids
-    """
-    # batch è una lista di tuple restituite da __getitem__
+
     features, labels, ids = zip(*batch)
     
-    # Troviamo la lunghezza massima nel batch corrente
+    # max length of current batch
     lengths = [f.shape[0] for f in features]
     max_len = max(lengths)
     feature_dim = features[0].shape[1]
     
     batch_size = len(features)
     
-    # Inizializziamo i tensori di padding (tutti zeri)
+    # initialize padding tensor (all zeros)
     padded_features = torch.zeros(batch_size, max_len, feature_dim)
-    # Maschera: True indica che la posizione è padding (da ignorare)
-    # Nota: In PyTorch Transformer spesso True=Ignore. Verifica sempre la documentazione.
-    # Qui usiamo: True = Padding (da ignorare).
+    # Mask: True means position is padding (to ignore)
     masks = torch.ones(batch_size, max_len, dtype=torch.bool) 
     
     for i, seq in enumerate(features):
         end = lengths[i]
         padded_features[i, :end, :] = seq
-        masks[i, :end] = False # Le posizioni con dati reali sono False (non ignorare)
+        masks[i, :end] = False 
         
     labels = torch.stack(labels)
     

@@ -7,7 +7,7 @@ import wandb
 import numpy as np
 from tqdm import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau  # <--- IMPORTANTE
-
+import random
 import os
 
 # Importa i moduli base esistenti (per coerenza e utilità comuni)
@@ -21,9 +21,7 @@ from core.models.recipe_verifier import RecipeVerifier
 from dataloader.CaptainCookRecipeDataset import CaptainCookRecipeDataset, recipe_collate_fn
 
 def train_task_verification_loop(config):
-    """
-    Gestisce il training con strategia Leave-One-Out (LOO).
-    """
+    
     # ===================================
     # ========== Initial Setup ==========
     # ===================================
@@ -43,6 +41,11 @@ def train_task_verification_loop(config):
     global_y_true = []
     global_y_pred = []
 
+    # --- Storage for Loss Curves ---
+    all_folds_train_losses = [] # Will store list of lists
+    all_folds_val_losses = []   # Will store list of lists
+    # ----------------------------------
+
     num_samples = len(full_dataset)
 
     # ===========================================
@@ -61,6 +64,12 @@ def train_task_verification_loop(config):
         # This forces the global accuracy to use the fold index as its X-axis
         wandb.define_metric("folds_processed")
         wandb.define_metric("running_loo_accuracy", step_metric="folds_processed")
+
+        wandb.define_metric("train_loss_fold", step_metric="epoch_in_fold")
+        # --- Metric for Validation Loss ---
+        wandb.define_metric("val_loss_fold", step_metric="epoch_in_fold")
+
+
     
     # k is the index of the recipe execution we are testing (so it will not be included in the training)
     for k in tqdm(range(num_samples), desc="LOO Folds"):
@@ -71,15 +80,37 @@ def train_task_verification_loop(config):
         # Skipping logic if we already have the metrics for that fold
         if os.path.exists(metric_path):
             saved_data = torch.load(metric_path)
+            
+            # 1. Update Global Metric Lists
             global_y_true.append(saved_data['label'])
             global_y_pred.append(saved_data['pred'])
 
+            # 2. Update Global Loss Lists (for the final average curve)
+            t_hist = saved_data.get('train_loss_history', [])
+            v_hist = saved_data.get('val_loss_history', [])
+            
+            all_folds_train_losses.append(t_hist)
+            all_folds_val_losses.append(v_hist)
+
+            # 3. Log to WandB (Replay history)
             if config.enable_wandb:
+                # Log Running Accuracy
                 curr_acc = np.mean(np.array(global_y_true) == np.array(global_y_pred))
                 wandb.log({
                     "folds_processed": k,
                     "running_loo_accuracy": curr_acc
                 })
+
+              
+                # "Replay" the saved loss history to WandB so the charts are complete
+                if t_hist and v_hist:
+                    for e_idx, (t_l, v_l) in enumerate(zip(t_hist, v_hist)):
+                        wandb.log({
+                            "train_loss_fold": t_l,
+                            "val_loss_fold": v_l,
+                            "epoch_in_fold": e_idx,
+                            "fold_group_id": f"fold_{k}"
+                        })
 
             continue
 
@@ -112,13 +143,13 @@ def train_task_verification_loop(config):
         
        # --- Optimizer and criterion definition ---
        # If Class 0 is 44% and Class 1 is 56%, weight should be ~1.27 for Class 0
-        pos_weight = torch.tensor([1.27]).to(config.device)
+        #pos_weight = torch.tensor([2.5]).to(config.device)
         optimizer = torch.optim.Adam(
             model.parameters(), 
             lr = config.lr,
             weight_decay = config.weight_decay 
             )
-        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        criterion = nn.BCEWithLogitsLoss()
 
         # --- SCHEDULER IMPLEMENTATION ---
         # mode='min' because we are monitoring the loss (which needs to decrease)
@@ -169,11 +200,32 @@ def train_task_verification_loop(config):
             # We pass the loss for this epoch
             # He will decide to wether deacrease the loss for the next epoch
             scheduler.step(avg_loss)
+
+            # --- Validation Step (Single Sample) ---
+            model.eval() # Switch to eval mode
+            val_loss_epoch = 0.0
+            with torch.no_grad():
+                # test_loader contains only the single LOO sample
+                for v_feat, v_label, v_mask, _ in test_loader:
+                    v_feat = v_feat.to(config.device)
+                    v_label = v_label.to(config.device).unsqueeze(1)
+                    v_mask = v_mask.to(config.device)
+                    
+                    # Use the same criterion to keep loss scales comparable
+                    v_out = model(v_feat, v_mask)
+                    v_loss = criterion(v_out, v_label)
+                    val_loss_epoch = v_loss.item()
             
+            model.train() # Switch back to train mode
+            
+            # Initialize local list if it's the first epoch (variable fold_val_losses needs to be defined before loop or here)
+            if epoch == 0: fold_val_losses = [] 
+            fold_val_losses.append(val_loss_epoch)
             
             if config.enable_wandb:
                 wandb.log({
                     "train_loss_fold": avg_loss,    # The Y-Axis
+                    "val_loss_fold": val_loss_epoch, # Log Validation Loss
                     "epoch_in_fold": epoch,         # The X-Axis (0 to 10)
                     "fold_group_id": f"fold_{k}",   # The Grouping Key (Fold 1, Fold 2...)
                     "lr": optimizer.param_groups[0]['lr']
@@ -211,6 +263,7 @@ def train_task_verification_loop(config):
                     'logits': val_logit,
                     'prob': sigmoid_output,
                     'train_loss_history': train_loss_history,
+                    'val_loss_history': fold_val_losses, 
                 }
                 torch.save(fold_metrics, metric_path)
                 
@@ -219,6 +272,9 @@ def train_task_verification_loop(config):
                 global_y_pred.append(val_pred)
         
         running_acc = np.mean(np.array(global_y_true) == np.array(global_y_pred))
+        # --- ADD THIS: Store fold history globally ---
+        all_folds_train_losses.append(train_loss_history)
+        all_folds_val_losses.append(fold_val_losses)
 
         if config.enable_wandb:
             wandb.log({
@@ -253,13 +309,35 @@ def train_task_verification_loop(config):
     y_true_arr = np.array(global_y_true)
     y_pred_arr = np.array(global_y_pred)
 
-    # avoid zero-division
     if len(y_true_arr) > 0:
         accuracy = np.mean(y_true_arr == y_pred_arr)
         correct_count = np.sum(y_true_arr == y_pred_arr)
     else:
         accuracy = 0.0
         correct_count = 0
+
+    if len(all_folds_train_losses) > 0:
+        # Convert to numpy: shape (num_folds, num_epochs)
+        np_train_losses = np.array(all_folds_train_losses)
+        np_val_losses = np.array(all_folds_val_losses)
+        
+        # Calculate mean across folds (axis 0)
+        avg_train_curve = np.mean(np_train_losses, axis=0)
+        avg_val_curve = np.mean(np_val_losses, axis=0)
+        
+        # Create a custom plot for WandB
+        if config.enable_wandb:
+            epochs = list(range(len(avg_train_curve)))
+            
+            wandb.log({
+                "avg_loss_curve": wandb.plot.line_series(
+                    xs=epochs, 
+                    ys=[avg_train_curve, avg_val_curve],
+                    keys=["avg_train_loss", "avg_val_loss"],
+                    title="Average Loss Curve (All Folds)",
+                    xname="epoch"
+                )
+            })
 
     print(f"\nTask Verification Results:")
     print(f"Total Recipes Processed: {len(y_true_arr)}")
@@ -314,9 +392,20 @@ def train_task_verification_loop(config):
         wandb.save(final_ckpt_path)
 
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    print(f"Random Seed explicitly set to: {seed}")
 
 def main():
     conf = Config()
+
+    set_seed(conf.seed)
 
     conf.print_config()
 
@@ -333,6 +422,7 @@ def main():
 
     if conf.enable_wandb:
         wandb.finish()
+
 
 
 if __name__ == "__main__":
