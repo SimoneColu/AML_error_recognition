@@ -13,9 +13,9 @@ class RecipeVerifier(nn.Module):
 
         # Configurable Dimensions
         # Raw Features from step segmentation (S,256)
-        self.input_dim = 256
+        self.input_dim = 768
         # Internal model dimension 
-        self.internal_dim = 128
+        self.internal_dim = 256
 
 
         # Projection of the input to the internal dimension
@@ -36,13 +36,13 @@ class RecipeVerifier(nn.Module):
         step_encoder_layer = EncoderLayer(
             d_model = self.internal_dim, 
             dim_feedforward = 512,
-            nhead = 2, 
+            nhead = 4, 
             dropout = self.config.dropout,
             batch_first = True)
         
         self.step_encoder = Encoder(
             step_encoder_layer, 
-            num_layers=1)
+            num_layers=2)
 
         # Decoder (Binary Classification)
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
@@ -73,7 +73,7 @@ class RecipeVerifier(nn.Module):
         x_masked_max = x.masked_fill(mask_expanded, -1e9)
         x_max, _ = x_masked_max.max(dim=1)  # (B, 128)
 
-        # 2. Average Pooling (The Stabilizer)
+        """ # 2. Average Pooling (The Stabilizer)
         # Invert mask: True for Data, False for Padding
         valid_mask_float = (~mask).unsqueeze(-1).float() 
         sum_embeddings = torch.sum(x * valid_mask_float, dim=1)
@@ -85,10 +85,10 @@ class RecipeVerifier(nn.Module):
 
         # Classify
         x = self.decoder(x_cat)
-        return x
+        return x """
         
         
-        """ # --- ONLY MAX POOLING --- 
+       # --- ONLY MAX POOLING --- 
         
         # Mask Preparation
         mask_expanded = mask.unsqueeze(-1).expand(x.size())
@@ -101,7 +101,7 @@ class RecipeVerifier(nn.Module):
         # We pass x_max directly (size is internal_dim, not internal_dim * 2)
         x = self.decoder(x_max)                                     # (B,1)
 
-        return x """
+        return x 
 
 
 
