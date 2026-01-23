@@ -35,8 +35,8 @@ class RecipeVerifier(nn.Module):
         # Transformer encoder
         step_encoder_layer = EncoderLayer(
             d_model = self.internal_dim, 
-            dim_feedforward = 512,
-            nhead = 4, 
+            dim_feedforward = 128,
+            nhead = 2, 
             dropout = self.config.dropout,
             batch_first = True)
         
@@ -48,7 +48,7 @@ class RecipeVerifier(nn.Module):
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
         self.decoder = MLP(
             input_size = self.internal_dim*2,
-            hidden_size = 128, 
+            hidden_size = 64, 
             output_size = 1)
 
     def forward(self,x,mask):
