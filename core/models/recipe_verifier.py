@@ -47,7 +47,7 @@ class RecipeVerifier(nn.Module):
         # Decoder (Binary Classification)
         # Input size doubled cause we test the Hybrid Pooling (Max + Avg)
         self.decoder = MLP(
-            input_size = self.internal_dim,
+            input_size = self.internal_dim*2,
             hidden_size = 64, 
             output_size = 1)
 
@@ -95,9 +95,9 @@ class RecipeVerifier(nn.Module):
         # Classify
         x = self.decoder(x_cat)
         return x 
+        
+       
         """
-       
-       
         
        # --- ONLY MAX POOLING --- 
         
@@ -112,7 +112,8 @@ class RecipeVerifier(nn.Module):
         # We pass x_max directly (size is internal_dim, not internal_dim * 2)
         x = self.decoder(x_max)                                     # (B,1)
         return x 
-
+        
+        """
         """
         
         """
