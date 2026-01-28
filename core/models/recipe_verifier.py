@@ -116,8 +116,6 @@ class RecipeVerifier(nn.Module):
         """
         """
         
-        """
-        
         
         
         
