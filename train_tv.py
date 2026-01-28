@@ -283,7 +283,7 @@ def train_task_verification_loop(config):
             })
 
         # --- Intermediate report ---
-        if k > 0 and k % 1 == 0:
+        if k > 0 and k % 1 == 0 and False:
             print(f"\n--- Intermediate results at fold {k} ---")
             
             # Conversione sicura in array numpy
