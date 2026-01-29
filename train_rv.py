@@ -215,8 +215,8 @@ def run_cross_validation (dataset, strategy='logo', groups=None, **cfg):
         train_subset = Subset(dataset, train_idx)
         val_subset   = Subset(dataset, val_idx)
 
-        train_loader = DataLoader(train_subset, batch_size=cfg['batch_size'], shuffle=True, num_workers=2, pin_memory=True)
-        val_loader   = DataLoader(val_subset, batch_size=cfg['batch_size'], shuffle=False, num_workers=2, pin_memory=True)
+        train_loader = DataLoader(train_subset, batch_size=cfg['bs'], shuffle=True, num_workers=2, pin_memory=True)
+        val_loader   = DataLoader(val_subset, batch_size=cfg['bs'], shuffle=False, num_workers=2, pin_memory=True)
 
         model = RecipeVerifier(
             input_dim=cfg['input_dim'],
@@ -300,7 +300,7 @@ def train_final_model(dataset, **cfg):
         config=cfg
     )
 
-    loader = DataLoader(dataset, batch_size=cfg['batch_size'], shuffle=True)
+    loader = DataLoader(dataset, batch_size=cfg['bs'], shuffle=True)
 
     model = RecipeVerifier(
         input_dim=cfg['input_dim'],
