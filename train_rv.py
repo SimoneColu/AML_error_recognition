@@ -300,7 +300,7 @@ def train_final_model(dataset, **cfg):
         config=cfg
     )
 
-    loader = DataLoader(dataset, batch_size=cfg['bs'], shuffle=True)
+    loader = DataLoader(dataset, batch_size=cfg['batch_size'], shuffle=True)
 
     model = RecipeVerifier(
         input_dim=cfg['input_dim'],
