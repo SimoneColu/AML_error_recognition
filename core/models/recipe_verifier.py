@@ -74,7 +74,7 @@ class RecipeVerifier(nn.Module):
         x = self.step_encoder(x, src_key_padding_mask=mask)         # (B,T,256)
 
         
-        
+        """
         # --- HYBRID POOLING ---
         
         # 1. Max Pooling
@@ -114,7 +114,7 @@ class RecipeVerifier(nn.Module):
         return x 
         
         """
-        """
+        
         
         
         
