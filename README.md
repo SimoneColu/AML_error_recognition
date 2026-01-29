@@ -11,6 +11,19 @@ The notebook includes:
 - Environment setup details (the notebook was developed and tested in a **Kaggle environment**)  
 - Cells to execute the full training pipeline  
 
+### Branch Contribution
+The contribution added by this branch are:
+- `core/models/RecipeVerifier.py`:
+    -  Implements the RecipeVerifier architecture using a Transformer Encoder backend.
+
+- `dataloader/CaptainCookRecipeDataset.py`:
+    - A custom PyTorch Dataset that maps pre-computed recipe features to labels from error_annotations.json.
+ 
+- `train_tv`:
+    - Implements a Leave-One-Out (LOO) Cross-Validation loop to provide reliable performance estimates on the recipe dataset.
+    - Integrates Weights & Biases (WandB) for real-time tracking of running accuracy and loss curves across all folds.
+
+
 ### Training command
 
 ```bash
@@ -24,4 +37,4 @@ python train_tv.py \
   --weight_decay 5e-2 \
   --dropout 0.3
 ```
-**EXTRA**: An additional code snippet is provided in the notebook to analyze the previously obtained results.
+**EXTRA**: An additional code snippet is provided in the notebook to analyze the results stored in `checkpoints`, allowing for the calculation of final aggregate accuracy and the visualization of average loss curves across all folds.
