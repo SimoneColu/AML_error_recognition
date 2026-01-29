@@ -288,3 +288,47 @@ def run_cross_validation (dataset, strategy='logo', groups=None, **cfg):
     print("\n--- GLOBAL PERFORMANCE (OPTIMIZED THRESHOLD) ---")
     print_model_metrics(f"FINAL_OPT_{best_t:.2f}", final_preds, oof_labels, oof_probs)
     compute_detailed_metrics(oof_preds, oof_labels)
+
+def train_final_model(dataset, **cfg):
+    """
+    Trains the model on the 100% of the dataset and saves the state_dict.
+    Use this after CV to prepare the model for delivery.
+    """
+    run = wandb.init(
+        project=cfg.get("project_name", "DAGNN_final_training"),
+        name=cfg.get("run_name", "final_prod_run"),
+        config=cfg
+    )
+
+    loader = DataLoader(dataset, batch_size=cfg['bs'], shuffle=True)
+
+    model = RecipeVerifier(
+        input_dim=cfg['input_dim'],
+        hidden_dim=cfg.get('hidden_dim', 64),
+        num_layers=cfg.get('num_layers', 2),
+        dropout=cfg.get('dropout', 0.5)
+    ).to(cfg['device'])
+
+    optimizer = Adam(model.parameters(), lr=cfg['lr'], weight_decay=cfg['wd'])
+    criterion = nn.BCEWithLogitsLoss()
+    
+    print(f"Starting Final Training on {len(dataset)} graphs...")
+
+    for ep in range(1, cfg['epochs'] + 1):
+        train_loss, train_acc = train_one_epoch(model, loader, optimizer, criterion, cfg['device'])
+        
+        if ep % 5 == 0:
+            print(f"Epoch {ep:03d} | Loss: {train_loss:.4f} | Acc: {train_acc:.4f}")
+            wandb.log({
+                "final_epoch": ep,
+                "final_loss": train_loss,
+                "final_acc": train_acc
+            })
+
+    # Save the state_dict (Weights only)
+    save_path = os.path.join(cfg.get('save_dir', './'), "recipe_verifier_final.pt")
+    torch.save(model.state_dict(), save_path)
+    print(f"Successfully saved final model to: {save_path}")
+    
+    run.finish()
+    return save_path
