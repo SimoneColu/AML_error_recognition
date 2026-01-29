@@ -1,27 +1,52 @@
-# AML/DAAI 2025 - Task Verification With Transformer
+# AML 2025 - Main Repository Information
+
+This repository contains the code and experimental artifacts for the **Mistake Detection** project submitted to **AML 2025 Course**.
+
+The project is organized into multiple branches, each corresponding to a specific experiment, model variant, or replication setting.
+
+## Repository Structure
+
+Each branch is **self-contained** and includes:
+- The complete source code for the corresponding experiment
+- A dedicated `README.md` with **instructions** to reproduce the results
+- Environment and dependency specifications
+
+Please refer to the `README.md` **inside each branch** for detailed replication instructions.
+
+## Branches Overview
+
+### `main`
+- Entry point of the repository
+- Copy of the CaptainCook base repository
+- Pointers to all experimental branches
+
+### `LSTM Baseline`
+Our LSTM baseline processes sequences of pre-extracted
+sub-segment features using a two-layer bidirectional LSTM
+architecture. The bidirectional design allows the model to
+capture both past and future context when making predic-
+tions about each sub-segment.
+
+### `features_extraction`
+- EgoVLP to extract features from videos 
+- Implementation of ActionFormer to segment videos in Step
+
+### `Substep1-groundtruth
+- Implementation of the step-segmentation using ground truth
+
+### `Hungarian-Matching`
+- Computing the graph realizations
+- Matching the visual features to the textual ones
+
+### `task-verification-transformer`
+- Core implementation of the **Task Verification Transformer** model
+- Training and evaluation code for the main architecture
+- Baseline results reported in the paper
+
+### `TaskVerification DAGNN`
+- Core implementation of the **Task Verification DAGNN** model
+- Training and evaluation code for the main architecture
+- Baseline results reported in the paper
 
 
-## Replication Package
-
-All the information required to reproduce the training process is available in the  
-[`task-verification-transformer-replication.ipynb`](task-verification-transformer-replication.ipynb) notebook.
-
-The notebook includes:
-- Instructions for downloading the required dependencies  
-- Environment setup details (the notebook was developed and tested in a **Kaggle environment**)  
-- Cells to execute the full training pipeline  
-
-### Training command
-
-```bash
-python train_tv.py \
-  --model_name "task_verification_transformer" \
-  --recipe_features_path "/kaggle/working/recipes_features.npy" \
-  --ckpt_directory "/kaggle/working/checkpoints" \
-  --num_epochs 30 \
-  --batch_size 8 \
-  --lr 1e-4 \
-  --weight_decay 5e-2 \
-  --dropout 0.3
-```
-**EXTRA**: An additional code snippet is provided in the notebook to analyze the previously obtained results.
+Each branch contains all the information required to reproduce its results independently.
