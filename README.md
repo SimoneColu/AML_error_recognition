@@ -4,6 +4,8 @@
 
 This repository contains the code and experimental artifacts for the **Mistake Detection** project submitted to **AML 2025 Course**.
 
+Additional data, like features or checkpoints, are available [here](https://drive.google.com/drive/folders/1bcaQ2tzSdp9nJTHYGcW6CAjubHQLIqHA?usp=drive_link)
+
 The project is organized into multiple branches, each corresponding to a specific experiment, model variant, or replication setting.
 
 ## Repository Structure
