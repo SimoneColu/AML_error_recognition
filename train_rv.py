@@ -222,7 +222,7 @@ def run_cross_validation (dataset, strategy='logo', groups=None, **cfg):
             input_dim=cfg['input_dim'],
             hidden_dim=cfg['hidden_dim'],
             num_layers=cfg['num_layers'],
-            dropout=cfg['num_layers']
+            dropout=cfg['dropout']
         ).to(cfg['device'])
 
         optimizer = Adam(model.parameters(), lr=cfg['lr'], weight_decay=cfg['wd'])
