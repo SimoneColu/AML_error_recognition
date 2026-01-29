@@ -1,5 +1,7 @@
 # AML 2025 - Main Repository Information
 
+![Project overview](assets/system_architecture.jpeg)
+
 This repository contains the code and experimental artifacts for the **Mistake Detection** project submitted to **AML 2025 Course**.
 
 The project is organized into multiple branches, each corresponding to a specific experiment, model variant, or replication setting.
@@ -21,32 +23,29 @@ Please refer to the `README.md` **inside each branch** for detailed replication 
 - Pointers to all experimental branches
 
 ### `LSTM Baseline`
-Our LSTM baseline processes sequences of pre-extracted
-sub-segment features using a two-layer bidirectional LSTM
-architecture. The bidirectional design allows the model to
-capture both past and future context when making predic-
-tions about each sub-segment.
+- Implementation of the LSTM baseline to spot mistakes in single steps
 
-### `features_extraction`
+### `features_extraction` (Step 1/2 in the Overview Image)
 - EgoVLP to extract features from videos 
 - Implementation of ActionFormer to segment videos in Step
 
-### `Substep1-groundtruth
+### `Substep1-groundtruth` (Step 3)
 - Implementation of the step-segmentation using ground truth
 
-### `Hungarian-Matching`
+### `Hungarian-Matching` (Step 4)
 - Computing the graph realizations
 - Matching the visual features to the textual ones
 
-### `task-verification-transformer`
+### `task-verification-transformer` (Step 5)
 - Core implementation of the **Task Verification Transformer** model
 - Training and evaluation code for the main architecture
 - Baseline results reported in the paper
 
-### `TaskVerification DAGNN`
+### `TaskVerification DAGNN` (Step 6)
 - Core implementation of the **Task Verification DAGNN** model
 - Training and evaluation code for the main architecture
 - Baseline results reported in the paper
 
 
 Each branch contains all the information required to reproduce its results independently.
+Other branches represents intermediate experiments that are not relevant in the project.
