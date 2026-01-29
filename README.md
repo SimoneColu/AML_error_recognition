@@ -1,39 +1,27 @@
-# AML/DAAI 2025 - Mistake Detection Project
+# AML/DAAI 2025 - Task Verification With Transformer
 
-## Environment Setup
 
-First of all, create a python environment with 
+## Replication Package
 
+All the information required to reproduce the training process is available in the  
+[`task-verification-transformer-replication.ipynb`](task-verification-transformer-replication.ipynb) notebook.
+
+The notebook includes:
+- Instructions for downloading the required dependencies  
+- Environment setup details (the notebook was developed and tested in a **Kaggle environment**)  
+- Cells to execute the full training pipeline  
+
+### Training command
+
+```bash
+python train_tv.py \
+  --model_name "task_verification_transformer" \
+  --recipe_features_path "/kaggle/working/recipes_features.npy" \
+  --ckpt_directory "/kaggle/working/checkpoints" \
+  --num_epochs 30 \
+  --batch_size 8 \
+  --lr 1e-4 \
+  --weight_decay 5e-2 \
+  --dropout 0.3
 ```
-python -m venv .venv
-pip install -r requirements.txt
-```
-
-Then, download the pre-extracted features for 1s segments and put them in the `data/features` directory.
-
-## Step 1: Baselines reproduction
-Download the official best checkpoints from [here](https://utdallas.app.box.com/s/uz3s1alrzucz03sleify8kazhuc1ksl3) (`error_recognition_best` directory) and place them in the `checkpoints`. Then run the evaluation for the error recognition task.
-
-**Example command**:
-```
-python -m core.evaluate --variant MLP --backbone omnivore --ckpt checkpoints/error_recognition_best/MLP/omnivore/error_recognition_MLP_omnivore_step_epoch_43.pt --split step --threshold 0.6
-```
-
-You should be able to reproduce results close to those reported in the paper (Table 2):
-
-| Split | Model | F1 | AUC |
-|-------|-------|----|-----|
-| Step | MLP (Omnivore) | 24.26 | 75.74 |
-| Recordings | MLP (Omnivore) | 55.42 | 63.03 |
-| Step | Transf. (Omnivore) | 55.39 | 75.62 |
-| Recordings | Transf. (Omnivore) | 40.73 | 62.27 |
-
-**NOTE**: Use the thresholds indicated in the official README.md of project (0.6 for step and 0.4 for recordings steps).
-
-## Acknowledgements
-
-This project builds on many repositories from the CaptainCook4D release. Please refer to the original codebases for more details.
-
-**Error Recognition**: https://github.com/CaptainCook4D/error_recognition
-
-**Features Extraction**: https://github.com/CaptainCook4D/feature_extractors
+**EXTRA**: An additional code snippet is provided in the notebook to analyze the previously obtained results.
